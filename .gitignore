@@ -1,0 +1,30 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+*.local
+
+# Build / framework caches
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+__unconfig*
+todos.json
+.fallow
+
+# Alchemy local state (CI uses CloudflareStateStore)
+.alchemy/
+
+# Local-only sandboxes
+.cachebro/
+.codemogger/
+
+# IDE
+.vscode/

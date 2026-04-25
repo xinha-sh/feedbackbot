@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0b0b0a"/>
+  <defs>
+    <pattern id="dots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#3a362e"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#dots)" opacity="0.6"/>
+
+  <g transform="translate(96, 96)">
+    <rect x="0" y="0" width="96" height="96" rx="6" stroke="#f4f1ea" stroke-width="6" fill="#ffe24a"/>
+    <path d="M21 32h54M21 48h33M21 64h42" stroke="#0a0a0a" stroke-width="6" stroke-linecap="square"/>
+    <circle cx="69" cy="48" r="6" fill="#0a0a0a"/>
+    <circle cx="75" cy="64" r="6" fill="#0a0a0a"/>
+  </g>
+
+  <text x="230" y="165" font-family="Space Grotesk, system-ui, sans-serif" font-size="42" font-weight="700" letter-spacing="-1" fill="#f4f1ea">FeedbackBot</text>
+
+  <g transform="translate(96, 260)">
+    <text font-family="Space Grotesk, system-ui, sans-serif" font-size="100" font-weight="700" letter-spacing="-4" fill="#f4f1ea">
+      <tspan x="0" y="0">It's already</tspan>
+      <tspan x="0" y="120" fill="#0a0a0a" style="paint-order:stroke;stroke:#ffe24a;stroke-width:8">
+        <tspan dx="0" fill="#0a0a0a">collecting</tspan>
+      </tspan>
+    </text>
+    <rect x="-8" y="150" width="640" height="120" fill="#ffe24a" transform="skewX(-2)"/>
+    <text x="0" y="240" font-family="Space Grotesk, system-ui, sans-serif" font-size="100" font-weight="700" letter-spacing="-4" fill="#0a0a0a">feedback.</text>
+  </g>
+
+  <text x="96" y="570" font-family="JetBrains Mono, ui-monospace, monospace" font-size="24" fill="#c4bdb0" letter-spacing="1">
+    Zero signup · One script tag · Claim later
+  </text>
+</svg>

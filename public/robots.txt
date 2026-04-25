@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /b/
+Disallow: /dashboard/
+Disallow: /api/
+
+Sitemap: https://usefeedbackbot.com/sitemap.xml

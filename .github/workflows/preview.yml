@@ -1,0 +1,104 @@
+name: Preview deploy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Cancel in-flight runs of this workflow for the same PR — only the
+# latest commit's preview matters.
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      STAGE: pr-${{ github.event.pull_request.number }}
+      # Cloudflare auth.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Alchemy state encryption + remote state store.
+      ALCHEMY_PASSWORD: ${{ secrets.ALCHEMY_PASSWORD }}
+      ALCHEMY_STATE_TOKEN: ${{ secrets.ALCHEMY_STATE_TOKEN }}
+      # Required app secrets (shared with prod).
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      INTEGRATIONS_ENCRYPTION_KEY: ${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
+      HMAC_SECRET_SEED: ${{ secrets.HMAC_SECRET_SEED }}
+      # Optional integrations (shared test-mode credentials).
+      DODO_PAYMENTS_API_KEY: ${{ secrets.DODO_PAYMENTS_API_KEY }}
+      DODO_PAYMENTS_WEBHOOK_SECRET: ${{ secrets.DODO_PAYMENTS_WEBHOOK_SECRET }}
+      DODO_PAYMENTS_ENV: test_mode
+      UNOSEND_API_KEY: ${{ secrets.UNOSEND_API_KEY }}
+      UNOSEND_FROM: ${{ secrets.UNOSEND_FROM }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+      SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
+      SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}
+      # NOTE: GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET are intentionally
+      # not passed — alchemy.run.ts zeroes them on non-production stages
+      # so the social-github provider stays inactive.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Deploy preview
+        id: deploy
+        run: |
+          set -o pipefail
+          pnpm exec alchemy deploy --stage "$STAGE" 2>&1 | tee deploy.log
+          # Last `app: '<url>'` line printed by alchemy.run.ts:console.log.
+          URL=$(grep -oE "app: '[^']+'" deploy.log | tail -n1 | sed -E "s/app: '(.*)'/\1/")
+          if [ -z "$URL" ]; then
+            echo "::error::Could not parse preview URL from alchemy output"
+            exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview URL on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.deploy.outputs.url }}'
+            const body = [
+              '🔬 **Preview ready**',
+              '',
+              url,
+              '',
+              '> Magic-link sign-in works. GitHub OAuth + full Dodo billing webhook reconciliation only work on production. See DECISIONS.md for the full caveat list.',
+            ].join('\n')
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            })
+            const marker = '🔬 **Preview ready**'
+            const existing = comments.find((c) => c.body && c.body.includes(marker))
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              })
+            }

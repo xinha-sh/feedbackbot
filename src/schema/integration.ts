@@ -1,0 +1,92 @@
+import { z } from 'zod'
+import { ClassificationKindSchema } from './ticket'
+
+// ── integration kinds ────────────────────────────────────────────
+
+export const IntegrationKinds = ['webhook', 'slack'] as const
+export const IntegrationKindSchema = z.enum(IntegrationKinds)
+export type IntegrationKind = z.infer<typeof IntegrationKindSchema>
+
+// kind-specific credentials — stored encrypted at rest via HKDF-derived
+// workspace key (see src/lib/crypto.ts)
+const WebhookCreds = z.object({
+  kind: z.literal('webhook'),
+  url: z.string().url(),
+  hmac_secret: z.string().min(16).max(256),
+})
+const SlackCreds = z.object({
+  kind: z.literal('slack'),
+  access_token: z.string().min(1),
+  team_id: z.string().min(1),
+  team_name: z.string().optional(),
+})
+export const IntegrationCredsSchema = z.discriminatedUnion('kind', [
+  WebhookCreds,
+  SlackCreds,
+])
+export type IntegrationCreds = z.infer<typeof IntegrationCredsSchema>
+
+// ── create / update integration ──────────────────────────────────
+
+export const IntegrationCreateSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  creds: IntegrationCredsSchema,
+  // optional initial routes — one per classification kind we want to
+  // deliver to this integration
+  routes: z
+    .array(
+      z.object({
+        ticket_type: ClassificationKindSchema,
+        config: z.record(z.string(), z.unknown()).default({}),
+      }),
+    )
+    .default([]),
+})
+export type IntegrationCreate = z.infer<typeof IntegrationCreateSchema>
+
+export const IntegrationPatchSchema = z.object({
+  name: z.string().trim().min(1).max(60).optional(),
+  enabled: z.boolean().optional(),
+  creds: IntegrationCredsSchema.optional(),
+})
+export type IntegrationPatch = z.infer<typeof IntegrationPatchSchema>
+
+// ── per-route config shapes ──────────────────────────────────────
+
+export const SlackRouteConfigSchema = z.object({
+  channel_id: z.string().min(1),
+  channel_name: z.string().optional(),
+})
+export type SlackRouteConfig = z.infer<typeof SlackRouteConfigSchema>
+
+// ── outbound webhook payload (generic kind='webhook') ────────────
+// This is the public contract customers integrate against. Shape is
+// locked by Plan.md §8.2.
+
+export const OutboundTicketPayloadSchema = z.object({
+  event: z.literal('ticket.created'),
+  workspace: z.object({
+    id: z.string(),
+    domain: z.string(),
+  }),
+  ticket: z.object({
+    id: z.string(),
+    message: z.string(),
+    page_url: z.string().nullable(),
+    email: z.string().nullable(),
+    created_at: z.number().int(),
+    classification: z.object({
+      primary: ClassificationKindSchema,
+      secondary: z.array(ClassificationKindSchema),
+      confidence: z.number(),
+      summary: z.string(),
+      suggested_title: z.string(),
+    }),
+    screenshot_url: z.string().url().optional(),
+  }),
+  delivery: z.object({
+    id: z.string(),
+    attempt: z.number().int().nonnegative(),
+  }),
+})
+export type OutboundTicketPayload = z.infer<typeof OutboundTicketPayloadSchema>

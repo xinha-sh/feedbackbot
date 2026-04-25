@@ -1,0 +1,25 @@
+{
+  "projectName": "feedbackbot",
+  "mode": "file-router",
+  "typescript": true,
+  "packageManager": "bun",
+  "includeExamples": false,
+  "tailwind": true,
+  "addOnOptions": {},
+  "envVarValues": {},
+  "git": true,
+  "install": true,
+  "routerOnly": false,
+  "version": 1,
+  "framework": "react",
+  "chosenAddOns": [
+    "cloudflare",
+    "compiler",
+    "form",
+    "paraglide",
+    "better-auth",
+    "posthog",
+    "tanstack-query",
+    "store"
+  ]
+}

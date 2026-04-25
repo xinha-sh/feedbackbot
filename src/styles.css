@@ -1,0 +1,379 @@
+@import "tailwindcss";
+
+/* ────────────────────────────────────────────────────────────────────
+   FeedbackBot design tokens — ported from hi-tokens.jsx
+   Direction: playful brutalist × Swiss print.
+   - Thick 2px borders, hard offset shadows (no blur)
+   - Paper-white / true-black neutrals with yolk-yellow accent
+   - Space Grotesk display, JetBrains Mono for code + micro-labels,
+     Instrument Serif for editorial pull-quotes
+   ──────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-fg: var(--fg);
+  --color-fg-mute: var(--fg-mute);
+  --color-fg-faint: var(--fg-faint);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-spam: var(--spam);
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-serif: "Instrument Serif", ui-serif, serif;
+
+  --shadow-brut: 6px 6px 0 0 var(--border);
+  --shadow-brut-sm: 4px 4px 0 0 var(--border);
+  --shadow-brut-accent: 4px 4px 0 0 var(--accent-ink);
+}
+
+:root,
+html[data-theme="light"] {
+  --bg: #f4f1ea;
+  --surface: #ffffff;
+  --surface-alt: #ece7db;
+  --fg: #0a0a0a;
+  --fg-mute: #3a362e;
+  --fg-faint: #7a7368;
+  --border: #0a0a0a;
+  --border-soft: #b8b0a0;
+  --accent: #ffe24a;
+  --accent-ink: #0a0a0a;
+  --ok: #1f6b3a;
+  --danger: #c0391c;
+  --info: #2558c8;
+  --spam: #8a8178;
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  --bg: #0b0b0a;
+  --surface: #141312;
+  --surface-alt: #1b1a18;
+  --fg: #f4f1ea;
+  --fg-mute: #c4bdb0;
+  --fg-faint: #7a7368;
+  --border: #f4f1ea;
+  --border-soft: #3a362e;
+  --accent: #ffe24a;
+  --accent-ink: #0a0a0a;
+  --ok: #3fdc80;
+  --danger: #ff6a4a;
+  --info: #7aa8ff;
+  --spam: #6a655a;
+  color-scheme: dark;
+}
+
+/* ── globals ── */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.2s, color 0.2s;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Primitives — class-based so they work in raw JSX or as React
+   wrappers (see src/components/ui/brut.tsx).
+   ──────────────────────────────────────────────────────────────────── */
+
+@layer components {
+  /* display type */
+  .h-display {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 0.94;
+  }
+  .h-serif {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  .h-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* chip */
+  .hi-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1.5px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    background: var(--surface);
+  }
+  .hi-chip-accent {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent-ink);
+  }
+
+  /* hard-shadow card */
+  .hi-card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    position: relative;
+  }
+  .hi-card-raised {
+    box-shadow: var(--shadow-brut);
+  }
+
+  /* brutalist button */
+  .hi-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    transition: transform 0.08s, box-shadow 0.08s;
+    box-shadow: var(--shadow-brut-sm);
+    white-space: nowrap;
+  }
+  .hi-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 0 var(--border);
+  }
+  .hi-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 0 var(--border);
+  }
+  .hi-btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent-ink);
+    box-shadow: var(--shadow-brut-accent);
+  }
+  .hi-btn-primary:hover {
+    box-shadow: 5px 5px 0 0 var(--accent-ink);
+  }
+  .hi-btn-primary:active {
+    box-shadow: 2px 2px 0 0 var(--accent-ink);
+  }
+  .hi-btn-ghost {
+    box-shadow: none;
+    background: transparent;
+  }
+  .hi-btn-ghost:hover {
+    box-shadow: var(--shadow-brut-sm);
+    transform: translate(-2px, -2px);
+  }
+  .hi-btn-sm {
+    padding: 7px 14px;
+    font-size: 13px;
+    box-shadow: 3px 3px 0 0 var(--border);
+  }
+  .hi-btn-sm:hover {
+    box-shadow: 4px 4px 0 0 var(--border);
+  }
+  .hi-btn-sm.hi-btn-primary {
+    box-shadow: 3px 3px 0 0 var(--accent-ink);
+  }
+  .hi-btn-sm.hi-btn-primary:hover {
+    box-shadow: 4px 4px 0 0 var(--accent-ink);
+  }
+
+  /* Swiss-style section label */
+  .hi-slab {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-mute);
+    padding-bottom: 16px;
+    border-bottom: 1.5px solid var(--border);
+    margin-bottom: 40px;
+  }
+  .hi-slab-num {
+    color: var(--fg);
+    font-weight: 700;
+    display: inline-block;
+    min-width: 40px;
+  }
+
+  /* rules */
+  .hi-rule {
+    height: 1.5px;
+    background: var(--border);
+  }
+  .hi-rule-soft {
+    height: 1px;
+    background: var(--border-soft);
+  }
+
+  /* code block */
+  .hi-code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.7;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    color: var(--fg);
+    padding: 20px 24px;
+    white-space: pre;
+    overflow-x: auto;
+    position: relative;
+  }
+  .hi-code-raised {
+    box-shadow: var(--shadow-brut);
+  }
+  .hi-code .c-com {
+    color: var(--fg-faint);
+    font-style: italic;
+  }
+  .hi-code .c-tag {
+    color: var(--danger);
+    font-weight: 500;
+  }
+  .hi-code .c-atr {
+    color: var(--info);
+  }
+  .hi-code .c-str {
+    color: var(--ok);
+  }
+  .hi-code .c-brk {
+    color: var(--fg-mute);
+  }
+
+  /* classification tag pills */
+  .hi-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1.5px solid;
+    line-height: 1.4;
+  }
+  .hi-tag-bug {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: color-mix(in oklch, var(--danger) 10%, transparent);
+  }
+  .hi-tag-feat {
+    color: var(--ok);
+    border-color: var(--ok);
+    background: color-mix(in oklch, var(--ok) 10%, transparent);
+  }
+  .hi-tag-query {
+    color: var(--info);
+    border-color: var(--info);
+    background: color-mix(in oklch, var(--info) 10%, transparent);
+  }
+  .hi-tag-spam {
+    color: var(--spam);
+    border-color: var(--spam);
+    background: color-mix(in oklch, var(--spam) 10%, transparent);
+  }
+
+  /* marquee */
+  @keyframes hi-marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .hi-marquee-inner {
+    display: flex;
+    gap: 56px;
+    animation: hi-marquee 40s linear infinite;
+    width: max-content;
+  }
+
+  /* ticket slide-in */
+  @keyframes hi-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .hi-slide-in {
+    animation: hi-slide-in 0.4s ease-out;
+  }
+
+  /* hide scrollbar utility */
+  .hi-nobar::-webkit-scrollbar {
+    display: none;
+  }
+  .hi-nobar {
+    scrollbar-width: none;
+  }
+
+  /* focus ring */
+  .hi-focus:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* dotted backdrop for hero sections */
+  .hi-dots {
+    background-image: radial-gradient(
+      circle,
+      var(--border-soft) 1px,
+      transparent 1px
+    );
+    background-size: 18px 18px;
+    background-position: 0 0;
+  }
+}
