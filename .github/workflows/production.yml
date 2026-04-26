@@ -46,6 +46,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Generate paraglide messages
+        # tsc on a clean checkout fails because src/paraglide/* is
+        # generated (gitignored). The vite build during deploy creates
+        # them automatically, but typecheck runs first.
+        run: pnpm exec paraglide-js compile
+
       - name: Typecheck + tests
         run: |
           pnpm exec tsc --noEmit
