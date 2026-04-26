@@ -89,13 +89,21 @@ jobs:
         with:
           script: |
             const url = '${{ steps.deploy.outputs.url }}'
-            const body = [
+            const isPreviewSub = url.endsWith('.preview.usefeedbackbot.com')
+            const lines = [
               '🔬 **Preview ready**',
               '',
               url,
               '',
               '> Magic-link sign-in works. GitHub OAuth and Dodo billing are inactive on previews — see DECISIONS.md for the full caveat list.',
-            ].join('\n')
+            ]
+            if (isPreviewSub) {
+              lines.push('')
+              lines.push(
+                '> _First-time TLS cert provisioning on a fresh PR hostname takes ~5–10 min via Google CA. If you see a handshake error, give it a few minutes and refresh._',
+              )
+            }
+            const body = lines.join('\n')
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
