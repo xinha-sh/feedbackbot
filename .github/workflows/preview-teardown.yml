@@ -32,6 +32,8 @@ jobs:
 
       - name: Destroy preview
         # Tolerate the stage being already gone (idempotent).
+        # `alchemy destroy` doesn't have a --yes flag; it doesn't
+        # prompt either, so a bare invocation is fine.
         run: |
-          pnpm exec alchemy destroy --stage "$STAGE" --yes || \
+          pnpm exec alchemy destroy --stage "$STAGE" || \
             echo "destroy returned non-zero — stage may already be torn down"
