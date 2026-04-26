@@ -84,7 +84,11 @@ jobs:
           pnpm exec alchemy deploy --stage "$STAGE" 2>&1 | tee deploy.log || true
           ALCHEMY_EXIT=${PIPESTATUS[0]}
           echo "alchemy exit: $ALCHEMY_EXIT"
-          URL=$(grep -oE "app: '[^']+'" deploy.log | tail -n1 | sed -E "s/app: '(.*)'/\1/")
+          # Strip ANSI escape codes alchemy uses for colored output,
+          # then extract the workers.dev URL printed by alchemy.run.ts.
+          URL=$(sed -E "s/\x1b\[[0-9;]*m//g" deploy.log \
+            | grep -oE "https://[a-zA-Z0-9.-]+\.workers\.dev" \
+            | tail -n1)
           if [ -z "$URL" ]; then
             echo "::error::Deploy failed (no app URL in output, alchemy exit $ALCHEMY_EXIT)"
             exit 1
