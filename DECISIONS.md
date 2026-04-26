@@ -117,6 +117,14 @@ original framing.
 
 ---
 
+## 2026-04-26 — Custom preview subdomain `pr-N.preview.usefeedbackbot.com` (continued)
+
+**Cert provisioning timing:** first-time TLS cert on a fresh `pr-N` hostname takes ~5–10 min to go from `initializing → pending_validation → active`. Cloudflare uses Google CA via DNS-01 TXT validation. PR comments now include a one-line warning so reviewers know to wait + refresh if they hit a TLS handshake error on the first click.
+
+**Known issue — `preview-teardown.yml` didn't fire on `gh pr close`:** Closing PR #2 via `gh pr close --delete-branch` did NOT trigger the `pull_request:closed` workflow run. The workflow is registered + active and fired correctly for PR #1 (closed via `gh pr merge --delete-branch`). Likely race between the `closed` event and the branch deletion. Workaround for now: run `pnpm exec alchemy destroy --stage pr-N` locally if a teardown is missed. Investigation deferred until it recurs in production usage.
+
+---
+
 ## 2026-04-26 — Custom preview subdomain `pr-N.preview.usefeedbackbot.com`
 
 - **Why:** workers.dev URLs in PR comments are noisy and unrelated-looking; preview links that share the apex with production feel like a first-class part of the product.
