@@ -32,7 +32,7 @@ export const loadLoginState = createServerFn({ method: 'GET' }).handler(
     const flags = {
       google_enabled:
         !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET,
-      magic_link_enabled: !!env.UNOSEND_API_KEY,
+      magic_link_enabled: !!env.RESEND_API_KEY,
     }
 
     const session = await auth.api

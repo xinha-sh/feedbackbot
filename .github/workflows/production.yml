@@ -30,8 +30,8 @@ jobs:
       DODO_PAYMENTS_WEBHOOK_SECRET: ${{ secrets.DODO_PAYMENTS_WEBHOOK_SECRET }}
       DODO_PAYMENTS_ENV: live_mode
       # Email + the rest.
-      UNOSEND_API_KEY: ${{ secrets.UNOSEND_API_KEY }}
-      UNOSEND_FROM: ${{ secrets.UNOSEND_FROM }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM: ${{ secrets.RESEND_FROM }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
       SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}

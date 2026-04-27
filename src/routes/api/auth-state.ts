@@ -22,7 +22,7 @@ async function handle(request: Request): Promise<Response> {
     return json(
       {
         google_enabled: !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET,
-        magic_link_enabled: !!env.UNOSEND_API_KEY,
+        magic_link_enabled: !!env.RESEND_API_KEY,
       },
       { headers: cors },
     )

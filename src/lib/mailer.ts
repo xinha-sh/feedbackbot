@@ -1,8 +1,9 @@
-// Transactional mail via Unosend. Sign up at unosend.co, verify the
-// sending domain once, then every call site in the app uses this
-// single helper. The only direct caller today is the Better Auth
-// magic-link sender in src/lib/auth.ts; notifications routed to
-// users in future features should land here too.
+// Transactional mail via Resend. Verify the sending domain once at
+// resend.com (Cloudflare DNS click-through handles the records),
+// then every call site in the app uses this single helper. The only
+// direct caller today is the Better Auth magic-link sender in
+// src/lib/auth.ts; notifications routed to users in future features
+// should land here too.
 
 import { env } from '#/env'
 
@@ -16,14 +17,16 @@ export type SendMail = {
 }
 
 export async function sendMail(msg: SendMail): Promise<void> {
-  if (!env.UNOSEND_API_KEY) {
-    throw new Error('UNOSEND_API_KEY not configured; cannot send mail')
+  if (!env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY not configured; cannot send mail')
   }
-  const from = env.UNOSEND_FROM ?? DEFAULT_FROM
-  const res = await fetch('https://api.unosend.co/emails', {
+  // `||` not `??` so an empty-string env var falls back to default
+  // (see alchemy.run.ts comment for the GH-secret-empty-string trap).
+  const from = env.RESEND_FROM || DEFAULT_FROM
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      authorization: `Bearer ${env.UNOSEND_API_KEY}`,
+      authorization: `Bearer ${env.RESEND_API_KEY}`,
       'content-type': 'application/json',
     },
     body: JSON.stringify({
@@ -36,6 +39,6 @@ export async function sendMail(msg: SendMail): Promise<void> {
   })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
-    throw new Error(`unosend ${res.status}: ${body || res.statusText}`)
+    throw new Error(`resend ${res.status}: ${body || res.statusText}`)
   }
 }

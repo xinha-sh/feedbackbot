@@ -29,8 +29,8 @@ jobs:
       INTEGRATIONS_ENCRYPTION_KEY: ${{ secrets.INTEGRATIONS_ENCRYPTION_KEY }}
       HMAC_SECRET_SEED: ${{ secrets.HMAC_SECRET_SEED }}
       # Email (so magic-link auth works on previews).
-      UNOSEND_API_KEY: ${{ secrets.UNOSEND_API_KEY }}
-      UNOSEND_FROM: ${{ secrets.UNOSEND_FROM }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM: ${{ secrets.RESEND_FROM }}
       SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       SLACK_CLIENT_ID: ${{ secrets.SLACK_CLIENT_ID }}
       SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}
