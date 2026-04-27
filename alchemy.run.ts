@@ -99,9 +99,9 @@ const DODO_PAYMENTS_WEBHOOK_SECRET = optionalSecret(
   'DODO_PAYMENTS_WEBHOOK_SECRET',
 )
 const DODO_PAYMENTS_ENV = process.env.DODO_PAYMENTS_ENV ?? 'test_mode'
-const UNOSEND_API_KEY = optionalSecret('UNOSEND_API_KEY')
-const UNOSEND_FROM =
-  process.env.UNOSEND_FROM ?? 'FeedbackBot <noreply@usefeedbackbot.com>'
+const RESEND_API_KEY = optionalSecret('RESEND_API_KEY')
+const RESEND_FROM =
+  process.env.RESEND_FROM ?? 'FeedbackBot <noreply@usefeedbackbot.com>'
 
 // ── Storage ──────────────────────────────────────────────────────
 
@@ -328,8 +328,8 @@ export const mainApp = await TanStackStart(APP_WORKER_ID, {
     DODO_PAYMENTS_API_KEY,
     DODO_PAYMENTS_WEBHOOK_SECRET,
     DODO_PAYMENTS_ENV,
-    UNOSEND_API_KEY,
-    UNOSEND_FROM,
+    RESEND_API_KEY,
+    RESEND_FROM,
   },
 })
 

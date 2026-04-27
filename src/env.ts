@@ -44,10 +44,10 @@ export interface Env {
   DODO_PAYMENTS_API_KEY?: string
   DODO_PAYMENTS_WEBHOOK_SECRET?: string
   DODO_PAYMENTS_ENV?: 'test_mode' | 'live_mode'
-  // Unosend — preferred sender for magic links. Falls back to
-  // env.EMAIL (Cloudflare EmailSender) when unset.
-  UNOSEND_API_KEY?: string
-  UNOSEND_FROM?: string // "FeedbackBot <noreply@usefeedbackbot.com>"
+  // Resend — transactional sender for magic links + future
+  // notifications. Verified domain configured at resend.com.
+  RESEND_API_KEY?: string
+  RESEND_FROM?: string // "FeedbackBot <noreply@usefeedbackbot.com>"
 }
 
 // Typed view of the ambient env provided by cloudflare:workers.
