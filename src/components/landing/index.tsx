@@ -3,20 +3,26 @@
 // section. Copy comes directly from the hi-fi design; styling uses
 // the hi-* classes + Btn/Chip/Slab/Tag/LogoMark primitives.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { getRouteApi } from '@tanstack/react-router'
 import {
   ArrowDown,
   ArrowUpRight,
   Check,
   Copy,
   Dot,
+  LayoutDashboard,
+  LogOut,
 } from 'lucide-react'
 
 import { Btn, Chip, LogoMark, Slab, Tag } from '#/components/ui/brut'
 import { ThemeToggle } from '#/components/theme-toggle'
+import type { LoginState } from '#/server/login-state'
 
 const INSTALL_SNIPPET =
   '<script src="https://usefeedbackbot.com/widget.js" defer></script>'
+
+const indexRoute = getRouteApi('/')
 
 export function Landing() {
   return (
@@ -39,6 +45,7 @@ export function Landing() {
 // ── Nav ──────────────────────────────────────────────────────────
 
 function Nav() {
+  const state = indexRoute.useLoaderData() as LoginState
   return (
     <nav className="fb-nav">
       <LogoMark size={32} />
@@ -50,11 +57,161 @@ function Nav() {
       </span>
       <div className="fb-nav-actions">
         <ThemeToggle />
-        <Btn as="a" href="/login" variant="ghost" size="sm">
-          Sign in
-        </Btn>
+        {state.signed_in && state.user ? (
+          <ProfileMenu
+            user={state.user}
+            claimedDomain={state.claimed_workspace_domain}
+          />
+        ) : (
+          <Btn as="a" href="/login" variant="ghost" size="sm">
+            Sign in
+          </Btn>
+        )}
       </div>
     </nav>
+  )
+}
+
+function ProfileMenu({
+  user,
+  claimedDomain,
+}: {
+  user: { email: string; name: string | null }
+  claimedDomain: string | null
+}) {
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement | null>(null)
+
+  // Click-outside + Escape close. Bind once when the menu opens so
+  // we're not subscribing to body events while the menu is closed.
+  useEffect(() => {
+    if (!open) return
+    const onDocClick = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const initial = (user.name ?? user.email).trim().charAt(0).toUpperCase()
+  const dashboardHref = claimedDomain
+    ? `/dashboard/${claimedDomain}`
+    : '/login'
+
+  async function logout() {
+    setOpen(false)
+    try {
+      await fetch('/api/auth/sign-out', {
+        method: 'POST',
+        credentials: 'include',
+      })
+    } catch {
+      // best-effort; reload either way so stale UI doesn't linger
+    }
+    window.location.href = '/'
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Account menu for ${user.email}`}
+        title={user.email}
+        className="hi-btn hi-btn-sm hi-focus"
+        style={{
+          padding: 0,
+          width: 32,
+          height: 32,
+          background: 'var(--accent)',
+          color: 'var(--accent-ink)',
+          borderColor: 'var(--accent-ink)',
+          fontWeight: 700,
+          boxShadow: '3px 3px 0 0 var(--accent-ink)',
+        }}
+      >
+        {initial}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="hi-card"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            right: 0,
+            minWidth: 220,
+            background: 'var(--surface)',
+            padding: 6,
+            zIndex: 60,
+          }}
+        >
+          <div
+            style={{
+              padding: '6px 10px 8px',
+              borderBottom: '1.5px solid var(--border-soft)',
+              fontSize: 12,
+              color: 'var(--fg-mute)',
+              wordBreak: 'break-all',
+              lineHeight: 1.4,
+            }}
+          >
+            Signed in as
+            <div style={{ color: 'var(--fg)', fontWeight: 600, marginTop: 2 }}>
+              {user.email}
+            </div>
+          </div>
+          <a
+            role="menuitem"
+            href={dashboardHref}
+            className="hi-focus"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 10px',
+              fontSize: 13,
+              color: 'var(--fg)',
+            }}
+          >
+            <LayoutDashboard size={14} strokeWidth={1.75} />
+            Dashboard
+          </a>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={logout}
+            className="hi-focus"
+            style={{
+              display: 'flex',
+              width: '100%',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 10px',
+              fontSize: 13,
+              color: 'var(--fg)',
+              background: 'transparent',
+              border: 'none',
+              textAlign: 'left',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            <LogOut size={14} strokeWidth={1.75} />
+            Log out
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 

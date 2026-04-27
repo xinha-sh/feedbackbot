@@ -84,17 +84,17 @@ function optionalSecret(name: string) {
   return alchemy.secret(process.env[name] ?? '', name)
 }
 
-// GitHub OAuth: only on production. The OAuth App's callback URL is
-// fixed at https://usefeedbackbot.com/api/auth/callback/github, so a
-// preview signing in via GitHub would 404 on callback. Zero out the
-// secrets on previews and the UI hides the button (see
+// Google OAuth: only on production. The OAuth client's redirect URI
+// is fixed at https://usefeedbackbot.com/api/auth/callback/google,
+// so a preview signing in via Google would 404 on callback. Zero
+// out the secrets on previews and the UI hides the button (see
 // /api/auth-state response).
-const GITHUB_CLIENT_ID = IS_PRODUCTION
-  ? optionalSecret('GITHUB_CLIENT_ID')
-  : alchemy.secret('', 'GITHUB_CLIENT_ID')
-const GITHUB_CLIENT_SECRET = IS_PRODUCTION
-  ? optionalSecret('GITHUB_CLIENT_SECRET')
-  : alchemy.secret('', 'GITHUB_CLIENT_SECRET')
+const GOOGLE_CLIENT_ID = IS_PRODUCTION
+  ? optionalSecret('GOOGLE_CLIENT_ID')
+  : alchemy.secret('', 'GOOGLE_CLIENT_ID')
+const GOOGLE_CLIENT_SECRET = IS_PRODUCTION
+  ? optionalSecret('GOOGLE_CLIENT_SECRET')
+  : alchemy.secret('', 'GOOGLE_CLIENT_SECRET')
 const SLACK_CLIENT_ID = optionalSecret('SLACK_CLIENT_ID')
 const SLACK_CLIENT_SECRET = optionalSecret('SLACK_CLIENT_SECRET')
 const SENTRY_DSN = optionalSecret('SENTRY_DSN')
@@ -324,8 +324,8 @@ export const mainApp = await TanStackStart(APP_WORKER_ID, {
     BETTER_AUTH_SECRET,
     INTEGRATIONS_ENCRYPTION_KEY,
     HMAC_SECRET_SEED,
-    GITHUB_CLIENT_ID,
-    GITHUB_CLIENT_SECRET,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
     SLACK_CLIENT_ID,
     SLACK_CLIENT_SECRET,
     SENTRY_DSN,

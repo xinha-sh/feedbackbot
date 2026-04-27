@@ -1,8 +1,8 @@
 // GET /api/auth-state
 // Reports which auth methods are wired on this deploy, so the /login
 // and /signup pages can hide buttons that wouldn't work. Used by
-// preview environments to suppress GitHub OAuth (its callback URL is
-// pinned at the prod apex).
+// preview environments to suppress Google OAuth (its callback URL
+// is pinned at the prod apex).
 
 import { createFileRoute } from '@tanstack/react-router'
 
@@ -20,7 +20,7 @@ async function handle(request: Request): Promise<Response> {
   try {
     return json(
       {
-        github_enabled: !!env.GITHUB_CLIENT_ID && !!env.GITHUB_CLIENT_SECRET,
+        google_enabled: !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET,
         magic_link_enabled: !!env.UNOSEND_API_KEY,
       },
       { headers: cors },
