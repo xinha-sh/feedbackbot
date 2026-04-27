@@ -1,8 +1,9 @@
 // GET /api/auth-state
 // Reports which auth methods are wired on this deploy, so the /login
-// and /signup pages can hide buttons that wouldn't work. Used by
-// preview environments to suppress GitHub OAuth (its callback URL is
-// pinned at the prod apex).
+// and /signup pages can hide buttons that wouldn't work. Google OAuth
+// is enabled on every stage where the credentials are provisioned —
+// previews use the better-auth oAuthProxy plugin to bounce the
+// callback through prod (see src/lib/auth.ts).
 
 import { createFileRoute } from '@tanstack/react-router'
 
@@ -20,7 +21,7 @@ async function handle(request: Request): Promise<Response> {
   try {
     return json(
       {
-        github_enabled: !!env.GITHUB_CLIENT_ID && !!env.GITHUB_CLIENT_SECRET,
+        google_enabled: !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET,
         magic_link_enabled: !!env.UNOSEND_API_KEY,
       },
       { headers: cors },

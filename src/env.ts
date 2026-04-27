@@ -36,8 +36,8 @@ export interface Env {
   BETTER_AUTH_URL?: string
   INTEGRATIONS_ENCRYPTION_KEY: string // base64-encoded 32 bytes
   HMAC_SECRET_SEED: string
-  GITHUB_CLIENT_ID?: string
-  GITHUB_CLIENT_SECRET?: string
+  GOOGLE_CLIENT_ID?: string
+  GOOGLE_CLIENT_SECRET?: string
   SENTRY_DSN?: string
   SLACK_CLIENT_ID?: string
   SLACK_CLIENT_SECRET?: string

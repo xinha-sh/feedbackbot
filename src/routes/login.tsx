@@ -1,9 +1,11 @@
-import { createFileRoute, useSearch } from '@tanstack/react-router'
+import { createFileRoute, redirect, useSearch } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 
 import { Btn, LogoMark, Slab } from '#/components/ui/brut'
+import { authClient } from '#/lib/auth-client'
 import { seoMeta } from '#/lib/seo'
 import { PLAN_LABEL, type PlanId } from '#/lib/billing/plans'
+import { loadLoginState } from '#/server/login-state'
 
 const PLAN_INTENT_KEY = 'fb:intended_plan'
 
@@ -12,6 +14,22 @@ export const Route = createFileRoute('/login')({
   validateSearch: (raw: Record<string, unknown>) => ({
     plan: typeof raw.plan === 'string' ? (raw.plan as string) : undefined,
   }),
+  // Loader runs server-side on first hit and on every client nav.
+  // It collapses the previous two useEffect probes (auth-state +
+  // workspace lookup) into one server round-trip and short-circuits
+  // signed-in users with a claimed workspace before we render.
+  loader: async () => {
+    const state = await loadLoginState()
+    if (state.signed_in && state.claimed_workspace_domain) {
+      throw redirect({
+        to: '/dashboard/$domain/billing',
+        params: { domain: state.claimed_workspace_domain },
+      })
+    }
+    return state
+  },
+  staleTime: 0,
+  shouldReload: true,
   head: () => ({
     meta: seoMeta({
       path: '/login',
@@ -25,6 +43,11 @@ type Stage = 'idle' | 'sending' | 'sent' | 'error'
 
 function LoginPage() {
   const search = useSearch({ from: '/login' })
+  const state = Route.useLoaderData()
+  const signedInNoWorkspace = state.signed_in
+  const googleEnabled = state.google_enabled
+  const magicLinkEnabled = state.magic_link_enabled
+
   const planSlug = search.plan
   const planId: PlanId | null =
     planSlug === 'lite' ||
@@ -45,69 +68,6 @@ function LoginPage() {
       // SessionStorage denied (private mode, etc.) — best-effort only.
     }
   }, [planId])
-
-  // If the visitor is already signed in, skip the form entirely:
-  //   - has a claimed workspace → redirect to its billing page (which
-  //     reads the sessionStorage intent and auto-fires checkout).
-  //   - no claimed workspace yet → redirect to home so they can
-  //     install the widget and claim one. The intent stays in
-  //     sessionStorage for when they eventually land on billing.
-  const [checkingSession, setCheckingSession] = useState(true)
-  const [signedInNoWorkspace, setSignedInNoWorkspace] = useState(false)
-  useEffect(() => {
-    let cancelled = false
-    type MeResponse = {
-      signed_in: boolean
-      workspaces: Array<{ id: string; domain: string; state: string; plan: string }>
-    }
-    fetch('/api/me/workspaces', { credentials: 'include' })
-      .then((r) => (r.ok ? (r.json() as Promise<MeResponse>) : null))
-      .then((data) => {
-        if (cancelled) return
-        if (!data?.signed_in) {
-          setCheckingSession(false)
-          return
-        }
-        const claimed = data.workspaces.find((w) => w.state === 'claimed')
-        if (claimed) {
-          window.location.replace(`/dashboard/${claimed.domain}/billing`)
-          return
-        }
-        // Signed in but no claimed workspace — show an explicit
-        // next-step panel instead of silently bouncing them home.
-        setSignedInNoWorkspace(true)
-        setCheckingSession(false)
-      })
-      .catch(() => {
-        if (!cancelled) setCheckingSession(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // Auth provider availability (e.g. preview deploys disable GitHub
-  // because the OAuth callback URL is fixed at the prod apex).
-  const [githubEnabled, setGithubEnabled] = useState(true)
-  useEffect(() => {
-    let cancelled = false
-    type AuthState = {
-      github_enabled?: boolean
-      magic_link_enabled?: boolean
-    }
-    fetch('/api/auth-state')
-      .then((r) => (r.ok ? (r.json() as Promise<AuthState>) : null))
-      .then((data) => {
-        if (cancelled) return
-        if (data && data.github_enabled === false) setGithubEnabled(false)
-      })
-      .catch(() => {
-        // best-effort; keep the button visible if the probe fails.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const [email, setEmail] = useState('')
   const [stage, setStage] = useState<Stage>('idle')
@@ -136,23 +96,6 @@ function LoginPage() {
       setStage('error')
       setError((err as Error).message || 'Failed to send magic link')
     }
-  }
-
-  if (checkingSession) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'grid',
-          placeItems: 'center',
-          padding: 24,
-          color: 'var(--fg-mute)',
-          fontSize: 13,
-        }}
-      >
-        Checking session…
-      </div>
-    )
   }
 
   if (signedInNoWorkspace) {
@@ -256,7 +199,7 @@ function LoginPage() {
         </Slab>
 
         <p style={{ color: 'var(--fg-mute)', fontSize: 14, marginBottom: 24 }}>
-          Sign in with a magic link or GitHub. No password.
+          Sign in with a magic link or Google. No password.
         </p>
 
         {planLabel && (
@@ -309,6 +252,7 @@ function LoginPage() {
           </div>
         ) : (
           <>
+            {magicLinkEnabled && (
             <form
               onSubmit={sendMagicLink}
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
@@ -348,52 +292,59 @@ function LoginPage() {
                 {stage === 'sending' ? 'Sending…' : 'Email me a magic link'}
               </Btn>
             </form>
+            )}
 
-            {githubEnabled && (
-              <>
+            {googleEnabled && magicLinkEnabled && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  margin: '20px 0',
+                }}
+              >
                 <div
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    margin: '20px 0',
+                    flex: 1,
+                    height: 1.5,
+                    background: 'var(--border)',
+                  }}
+                />
+                <span
+                  className="h-mono"
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--fg-faint)',
                   }}
                 >
-                  <div
-                    style={{
-                      flex: 1,
-                      height: 1.5,
-                      background: 'var(--border)',
-                    }}
-                  />
-                  <span
-                    className="h-mono"
-                    style={{
-                      fontSize: 11,
-                      letterSpacing: '0.08em',
-                      textTransform: 'uppercase',
-                      color: 'var(--fg-faint)',
-                    }}
-                  >
-                    or
-                  </span>
-                  <div
-                    style={{
-                      flex: 1,
-                      height: 1.5,
-                      background: 'var(--border)',
-                    }}
-                  />
-                </div>
-
-                <Btn
-                  as="a"
-                  variant="default"
-                  href="/api/auth/sign-in/social/github?callbackURL=/"
-                >
-                  Continue with GitHub
-                </Btn>
-              </>
+                  or
+                </span>
+                <div
+                  style={{
+                    flex: 1,
+                    height: 1.5,
+                    background: 'var(--border)',
+                  }}
+                />
+              </div>
+            )}
+            {googleEnabled && (
+              <Btn
+                variant="default"
+                onClick={() => {
+                  // Better Auth's social sign-in endpoint is POST-only;
+                  // the SDK wraps the redirect dance for us. callbackURL
+                  // is where we land after the proxy hop completes.
+                  authClient.signIn.social({
+                    provider: 'google',
+                    callbackURL: '/',
+                  })
+                }}
+              >
+                Continue with Google
+              </Btn>
             )}
 
             {error && (
