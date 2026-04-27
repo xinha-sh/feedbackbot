@@ -28,6 +28,8 @@ export const Route = createFileRoute('/login')({
     }
     return state
   },
+  staleTime: 0,
+  shouldReload: true,
   head: () => ({
     meta: seoMeta({
       path: '/login',
