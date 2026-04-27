@@ -20,7 +20,9 @@ export async function sendMail(msg: SendMail): Promise<void> {
   if (!env.RESEND_API_KEY) {
     throw new Error('RESEND_API_KEY not configured; cannot send mail')
   }
-  const from = env.RESEND_FROM ?? DEFAULT_FROM
+  // `||` not `??` so an empty-string env var falls back to default
+  // (see alchemy.run.ts comment for the GH-secret-empty-string trap).
+  const from = env.RESEND_FROM || DEFAULT_FROM
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {

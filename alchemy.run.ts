@@ -100,8 +100,12 @@ const DODO_PAYMENTS_WEBHOOK_SECRET = optionalSecret(
 )
 const DODO_PAYMENTS_ENV = process.env.DODO_PAYMENTS_ENV ?? 'test_mode'
 const RESEND_API_KEY = optionalSecret('RESEND_API_KEY')
+// `||` not `??` — an unset GitHub secret resolves to an empty string
+// (not undefined), so `??` would let "" through and we'd POST
+// `from: ""` to Resend (422 "domain is invalid"). Falsy fallback
+// catches both undefined and empty.
 const RESEND_FROM =
-  process.env.RESEND_FROM ?? 'FeedbackBot <noreply@usefeedbackbot.com>'
+  process.env.RESEND_FROM || 'FeedbackBot <noreply@usefeedbackbot.com>'
 
 // ── Storage ──────────────────────────────────────────────────────
 
