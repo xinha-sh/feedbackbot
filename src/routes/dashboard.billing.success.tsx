@@ -1,18 +1,49 @@
-import { createFileRoute, useSearch } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import { seoMeta } from '#/lib/seo'
+import { completeCheckout } from '#/server/complete-checkout'
 
 export const Route = createFileRoute('/dashboard/billing/success')({
-  component: BillingSuccess,
   validateSearch: (raw: Record<string, unknown>) => ({
+    cs: typeof raw.cs === 'string' ? raw.cs : undefined,
+    // Backwards-compat with previous Dodo configs that sent
+    // ?workspace_id=&status=. Either is OK; we prefer `cs` going
+    // forward.
     workspace_id:
-      typeof raw.workspace_id === 'string'
-        ? (raw.workspace_id as string)
-        : undefined,
-    status:
-      typeof raw.status === 'string' ? (raw.status as string) : undefined,
+      typeof raw.workspace_id === 'string' ? raw.workspace_id : undefined,
+    status: typeof raw.status === 'string' ? raw.status : undefined,
   }),
+  loader: async ({ location }) => {
+    const search = location.search as {
+      cs?: string
+      workspace_id?: string
+      status?: string
+    }
+
+    // Legacy redirect path: previous Dodo callbacks sent
+    // ?workspace_id=…&status=…. Hand off to /onboard/{ws} so any
+    // checkout sessions in flight don't 404 mid-deploy.
+    if (search.workspace_id) {
+      const failed =
+        search.status &&
+        search.status !== 'active' &&
+        search.status !== 'succeeded'
+      throw redirect({
+        to: '/onboard/$workspaceId',
+        params: { workspaceId: search.workspace_id },
+        search: { failed: failed ? search.status : undefined },
+      })
+    }
+
+    if (!search.cs) {
+      throw redirect({ to: '/' })
+    }
+
+    // Server-side: verify Dodo session, upsert user + workspace,
+    // mint magic-link verification value, return URL to redirect to.
+    const result = await completeCheckout({ data: { cs: search.cs } })
+    throw redirect({ href: result.url, reloadDocument: true })
+  },
   head: () => ({
     meta: seoMeta({
       path: '/dashboard/billing/success',
@@ -21,38 +52,3 @@ export const Route = createFileRoute('/dashboard/billing/success')({
     }),
   }),
 })
-
-// Dodo redirects here after checkout. We just hand off to the
-// onboarding state machine at /onboard/:id, which decides the next
-// step (enter domain, secure account, verify DNS, or show "payment
-// failed") based on workspace + session state.
-function BillingSuccess() {
-  const search = useSearch({ from: '/dashboard/billing/success' })
-  const workspaceId = search.workspace_id
-  const status = search.status
-
-  useEffect(() => {
-    if (!workspaceId) {
-      window.location.replace('/')
-      return
-    }
-    const failed = status && status !== 'active' && status !== 'succeeded'
-    const qs = failed ? `?failed=${encodeURIComponent(status!)}` : ''
-    window.location.replace(`/onboard/${workspaceId}${qs}`)
-  }, [workspaceId, status])
-
-  return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 24,
-        color: 'var(--fg-mute)',
-        fontSize: 13,
-      }}
-    >
-      Finishing up…
-    </div>
-  )
-}

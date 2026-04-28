@@ -116,6 +116,7 @@ function Nav() {
           <ProfileMenu
             user={state.user}
             claimedDomain={state.claimed_workspace_domain}
+            incompleteWorkspaceId={state.incomplete_workspace_id}
           />
         ) : (
           <Btn as="a" href="/login" variant="ghost" size="sm">
@@ -130,9 +131,11 @@ function Nav() {
 function ProfileMenu({
   user,
   claimedDomain,
+  incompleteWorkspaceId,
 }: {
   user: { email: string; name: string | null }
   claimedDomain: string | null
+  incompleteWorkspaceId: string | null
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement | null>(null)
@@ -156,9 +159,16 @@ function ProfileMenu({
   }, [open])
 
   const initial = (user.name ?? user.email).trim().charAt(0).toUpperCase()
-  const dashboardHref = claimedDomain
-    ? `/dashboard/${claimedDomain}`
-    : '/login'
+  // Profile menu's primary link adapts to the user's onboarding state
+  // so the label matches what the click actually does:
+  //   claimed   → /dashboard/{domain}
+  //   incomplete (paid but not verified) → resume /onboard/{ws}
+  //   neither   → /#pricing (they need to pick a plan first)
+  const primaryAction: { href: string; label: string } = claimedDomain
+    ? { href: `/dashboard/${claimedDomain}`, label: 'Dashboard' }
+    : incompleteWorkspaceId
+      ? { href: `/onboard/${incompleteWorkspaceId}`, label: 'Continue setup' }
+      : { href: '/#pricing', label: 'Choose a plan' }
 
   async function logout() {
     setOpen(false)
@@ -230,7 +240,7 @@ function ProfileMenu({
           </div>
           <a
             role="menuitem"
-            href={dashboardHref}
+            href={primaryAction.href}
             className="hi-focus"
             style={{
               display: 'flex',
@@ -242,7 +252,7 @@ function ProfileMenu({
             }}
           >
             <LayoutDashboard size={14} strokeWidth={1.75} />
-            Dashboard
+            {primaryAction.label}
           </a>
           <button
             type="button"
@@ -1062,7 +1072,7 @@ function Pricing() {
         'Public board',
       ],
       cta: 'Start with Lite',
-      href: '/signup?plan=lite',
+      href: '/api/checkout/start?plan=lite',
       primary: false,
     },
     {
@@ -1076,7 +1086,7 @@ function Pricing() {
         'Custom domain, no watermark',
       ],
       cta: 'Start with Starter',
-      href: '/signup?plan=starter',
+      href: '/api/checkout/start?plan=starter',
       primary: true,
     },
     {
@@ -1090,7 +1100,7 @@ function Pricing() {
         'SSO, audit log, API',
       ],
       cta: 'Choose Scale',
-      href: '/signup?plan=scale',
+      href: '/api/checkout/start?plan=scale',
       primary: false,
     },
   ]
