@@ -8,7 +8,7 @@
 
 export type PlanId = 'free' | 'lite' | 'starter' | 'scale'
 
-export const SLUG_TO_PLAN: Record<string, PlanId> = {
+const SLUG_TO_PLAN: Record<string, PlanId> = {
   'feedbackbot-lite': 'lite',
   'feedbackbot-starter': 'starter',
   'feedbackbot-scale': 'scale',

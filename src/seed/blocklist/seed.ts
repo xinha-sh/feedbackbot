@@ -34,7 +34,10 @@ export function blocklistSeedData(): Record<Bucket, Array<string>> {
 }
 
 // Write the full seed to a live KVNamespace. Safe to re-run — same
-// keys just overwrite.
+// keys just overwrite. Kept exported because it's the entry point a
+// deploy hook / one-off script will call against env.BLOCKLIST_KV;
+// not yet wired so static analysis can't see a caller.
+/** @expected-unused */
 export async function seedBlocklistKv(kv: KVNamespace): Promise<{
   freemail: number
   disposable: number

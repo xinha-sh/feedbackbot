@@ -2,18 +2,19 @@
 // arrays (see https://tanstack.com/start/v0/docs/framework/react/guide/seo).
 // No built-in title template — we do it manually.
 
-export const SITE_NAME = 'FeedbackBot'
+// SITE_URL is consumed by the sitemap route too — the others stay
+// internal to this module's `seoMeta`/`canonicalLink` helpers.
+const SITE_NAME = 'FeedbackBot'
 export const SITE_URL = 'https://usefeedbackbot.com'
-export const SITE_TAGLINE = "It's already collecting feedback. You just don't know it yet."
-export const SITE_DESCRIPTION =
+const SITE_DESCRIPTION =
   'Zero-signup feedback for any website. Drop one <script> tag — feedback flows in, AI-classified into bugs, features, queries, and spam, then fanned out to Slack, webhooks, and more. Claim the workspace later via DNS or email.'
-export const OG_IMAGE = `${SITE_URL}/og-image.svg`
+const OG_IMAGE = `${SITE_URL}/og-image.svg`
 
-export function titleFor(page?: string): string {
+function titleFor(page?: string): string {
   return page ? `${page} · ${SITE_NAME}` : `${SITE_NAME} — zero-signup feedback`
 }
 
-export type SeoMeta = Array<
+type SeoMeta = Array<
   | { title: string }
   | { name: string; content: string }
   | { property: string; content: string }
