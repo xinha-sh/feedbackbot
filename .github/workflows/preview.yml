@@ -69,6 +69,21 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Generate paraglide messages first — tsc on a clean checkout
+      # fails because src/paraglide/* is gitignored and only created
+      # by the vite build. Mirrors what production.yml does.
+      - name: Generate paraglide messages
+        run: pnpm exec paraglide-js compile
+
+      # Run typecheck + tests before spending the ~2 min on the
+      # alchemy deploy. The Dodo contract test runs here (preview is
+      # the only CI lane where it executes; production self-skips
+      # because DODO_PAYMENTS_ENV=live_mode there).
+      - name: Typecheck + tests
+        run: |
+          pnpm exec tsc --noEmit
+          pnpm test
+
       # Post a sticky "deploying…" comment immediately so the PR shows
       # progress before alchemy finishes (the deploy step itself can
       # take 2–3 min, plus first-time TLS adds ~5–10 min on a fresh PR
