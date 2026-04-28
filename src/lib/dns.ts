@@ -24,7 +24,7 @@ type DohResponse = {
  * Query DoH for TXT records on `_feedback.<domain>` and return the
  * raw values (strings). Stripped of their enclosing quotes.
  */
-export async function lookupVerificationTxt(
+async function lookupVerificationTxt(
   domain: string,
 ): Promise<Array<string>> {
   const url = new URL('https://1.1.1.1/dns-query')

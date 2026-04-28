@@ -4,7 +4,7 @@
 
 import { env } from '#/env'
 
-export type RequestEvent = {
+type RequestEvent = {
   route: string
   status: number
   durationMs: number
@@ -12,10 +12,11 @@ export type RequestEvent = {
 }
 
 /**
- * Record a per-request event. Safe to call from any route handler.
+ * Record a per-request event. Internal — call sites go through
+ * `withRequestMetrics` which is the public API.
  * Silently no-ops if the binding is unset (local dev without AE).
  */
-export function emitRequest(event: RequestEvent): void {
+function emitRequest(event: RequestEvent): void {
   if (!env.ANALYTICS) return
   try {
     env.ANALYTICS.writeDataPoint({

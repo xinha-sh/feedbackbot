@@ -1,7 +1,7 @@
 // Transport layer for the widget. Single POST to /api/ticket +
 // optional two-step screenshot upload.
 
-export const API_BASE = '__FB_API_BASE__' // replaced at build time
+const API_BASE = '__FB_API_BASE__' // replaced at build time
 
 export type SubmitInput = {
   message: string

@@ -1,6 +1,6 @@
 export type Theme = 'light' | 'dark'
 
-export const THEME_STORAGE_KEY = 'fb-theme'
+const THEME_STORAGE_KEY = 'fb-theme'
 export const DEFAULT_THEME: Theme = 'dark'
 
 export function applyTheme(theme: Theme) {

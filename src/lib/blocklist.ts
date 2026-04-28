@@ -2,9 +2,9 @@
 // (Task #9). Short per-check caching via CACHE_KV keeps this
 // near-free even at peak traffic.
 
-export type BlocklistBucket = 'freemail' | 'disposable' | 'strict'
+type BlocklistBucket = 'freemail' | 'disposable' | 'strict'
 
-export async function isInBlocklist(
+async function isInBlocklist(
   kv: KVNamespace,
   bucket: BlocklistBucket,
   domain: string,
@@ -17,7 +17,7 @@ export async function isFreemail(kv: KVNamespace, domain: string) {
   return isInBlocklist(kv, 'freemail', domain)
 }
 
-export async function isDisposable(kv: KVNamespace, domain: string) {
+async function isDisposable(kv: KVNamespace, domain: string) {
   return isInBlocklist(kv, 'disposable', domain)
 }
 

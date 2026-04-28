@@ -12,12 +12,12 @@
 
 import { hmacSha256Hex, verifyHmacSha256 } from '#/lib/crypto'
 
-export const SLACK_AUTHORIZE_URL = 'https://slack.com/oauth/v2/authorize'
-export const SLACK_OAUTH_ACCESS_URL = 'https://slack.com/api/oauth.v2.access'
+const SLACK_AUTHORIZE_URL = 'https://slack.com/oauth/v2/authorize'
+const SLACK_OAUTH_ACCESS_URL = 'https://slack.com/api/oauth.v2.access'
 
 // Bot-only scopes, enough for chat.postMessage + channel discovery.
 // We deliberately avoid the user_scope surface.
-export const SLACK_BOT_SCOPES = [
+const SLACK_BOT_SCOPES = [
   'chat:write',
   'chat:write.public',
   'channels:read',

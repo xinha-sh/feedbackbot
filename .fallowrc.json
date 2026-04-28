@@ -1,0 +1,56 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+
+  "entry": [
+    "src/index.{ts,tsx}",
+    "src/main.{ts,tsx}",
+    "alchemy.run.ts",
+    "src/do/**/*.ts",
+    "src/workers/**/*.ts",
+    "src/widget/index.ts",
+    "src/widget/loader.ts",
+    "scripts/**/*.ts"
+  ],
+
+  "dynamicallyLoaded": [
+    "src/integrations-core/registry.ts",
+    "src/integrations-core/index.ts",
+    "src/integrations-core/**/dispatch.ts",
+    "src/integrations-core/**/manifest.ts",
+    "src/lib/sentry.ts"
+  ],
+
+  "ignorePatterns": [
+    "public/widget/**",
+    "src/paraglide/**",
+    "src/routeTree.gen.ts",
+    "messages/**"
+  ],
+
+  "ignoreDependencies": [
+    "@better-auth/sso",
+    "@tanstack/router-plugin",
+    "@tanstack/react-form",
+    "@tanstack/react-store",
+    "@tanstack/store",
+    "@tanstack/devtools-event-client",
+    "babel-plugin-react-compiler",
+    "htm"
+  ],
+
+  "ignoreExports": [
+    {
+      "file": "src/schema/*.ts",
+      "exports": ["*"]
+    }
+  ],
+
+  "rules": {
+    "unused-files": "warn",
+    "unused-exports": "warn",
+    "unused-types": "off",
+    "unused-dependencies": "warn",
+    "unused-class-members": "off",
+    "unused-enum-members": "off"
+  }
+}
