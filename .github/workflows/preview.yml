@@ -51,6 +51,11 @@ jobs:
       # knows the provider exists.
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      # Test-mode Dodo bearer for the integration suite's contract
+      # test (src/__tests__/dodo-contract.test.ts). Distinct from
+      # DODO_PAYMENTS_API_KEY (which is the LIVE key on prod) so the
+      # test suite never touches live billing.
+      DODO_TEST_API_KEY: ${{ secrets.DODO_TEST_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -63,6 +68,21 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+
+      # Generate paraglide messages first — tsc on a clean checkout
+      # fails because src/paraglide/* is gitignored and only created
+      # by the vite build. Mirrors what production.yml does.
+      - name: Generate paraglide messages
+        run: pnpm exec paraglide-js compile
+
+      # Run typecheck + tests before spending the ~2 min on the
+      # alchemy deploy. The Dodo contract test runs here (preview is
+      # the only CI lane where it executes; production self-skips
+      # because DODO_PAYMENTS_ENV=live_mode there).
+      - name: Typecheck + tests
+        run: |
+          pnpm exec tsc --noEmit
+          pnpm test
 
       # Post a sticky "deploying…" comment immediately so the PR shows
       # progress before alchemy finishes (the deploy step itself can
