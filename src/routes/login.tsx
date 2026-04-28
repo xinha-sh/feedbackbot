@@ -101,7 +101,12 @@ function LoginPage() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           email,
-          callbackURL: '/',
+          // Land back on /login after verify; the loader then routes
+          // them based on workspace state (claimed → /dashboard,
+          // incomplete → /onboard/{ws}, neither → /#pricing). Avoids
+          // dropping a freshly-signed-in user with no plan back on
+          // the marketing landing page where they have no next step.
+          callbackURL: '/login',
         }),
       })
       if (!res.ok) {
@@ -278,11 +283,13 @@ function LoginPage() {
                 variant="default"
                 onClick={() => {
                   // Better Auth's social sign-in endpoint is POST-only;
-                  // the SDK wraps the redirect dance for us. callbackURL
-                  // is where we land after the proxy hop completes.
+                  // the SDK wraps the redirect dance for us. Same
+                  // callbackURL trick as magic-link: re-enter /login
+                  // so its loader routes the user to the right place
+                  // based on workspace state.
                   authClient.signIn.social({
                     provider: 'google',
-                    callbackURL: '/',
+                    callbackURL: '/login',
                   })
                 }}
               >
