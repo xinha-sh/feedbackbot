@@ -294,3 +294,52 @@ future readers.
 Turnstile is the obvious choice), tightening pending-workspace
 auto-creation. All deferred until production data shows we still
 have noise.
+
+---
+
+## 2026-04-29 — Turnstile hostname-add tied to DNS verification
+
+Cloudflare's Turnstile dashboard requires a non-empty hostname
+allowlist; the widget runs cross-origin on customer sites
+(peppyhop.com etc.), and a challenge served on a hostname not in
+the allowlist returns `hostname-mismatch`. Without auto-management
+the widget would only work on `usefeedbackbot.com`.
+
+**Picked**: PATCH the widget's `domains` array via the Cloudflare
+API every time a customer's DNS verification succeeds. The
+verification endpoint already proves the customer controls the
+domain — same trust we'd give a manual dashboard add. Helper at
+`src/lib/turnstile-admin.ts`, hook in
+`src/routes/api/verify-domain.ts:62`.
+
+**Auth**: a Cloudflare API token scoped only to "Account >
+Turnstile > Edit". Stored as `CF_API_TOKEN`; `CF_ACCOUNT_ID` and
+`CF_TURNSTILE_WIDGET_ID` (= the public site key) are non-secret
+env vars.
+
+**Concurrency**: GET-then-PATCH is read-then-merge, not a CAS.
+Two concurrent verifies on different domains could race and lose
+one entry. Self-healing: the next verify on either domain reads
+the current list and re-adds anything missing. Acceptable — the
+verify endpoint is rare per-domain and the failure mode is just
+"widget 403s for a few minutes until next verify in the system".
+
+**Failure handling**: helper logs and returns false on any
+failure; `verify-domain` continues to claim the workspace. We
+don't want a transient CF API outage to block onboarding. Operator
+visibility comes from the warning log
+(`turnstile hostname add failed`).
+
+**Trade-off accepted**: Cloudflare's per-widget hostname cap is
+finite (currently 1000). At that scale we'd need to either rotate
+to a second widget or move to a different anti-bot scheme. Not a
+near-term concern; flagged here so future-us doesn't get
+surprised.
+
+**Onboarding sequence is now**:
+  1. Pay → claim workspace (org + verification token)
+  2. Enter domain, add DNS TXT
+  3. Click "Verify" → DNS resolves → workspace claimed →
+     **CF widget hostnames PATCHed (this change)**
+  4. Install snippet → widget mints Turnstile tokens that
+     siteverify with the correct hostname

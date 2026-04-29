@@ -52,6 +52,15 @@ export interface Env {
   // bypass (same pattern as Dodo). Public site key is baked into
   // the widget bundle, not here.
   TURNSTILE_SECRET?: string
+  // Cloudflare API access for managing the Turnstile widget's
+  // hostname allowlist. On every successful domain verification
+  // we PATCH the widget to add the new hostname so the customer's
+  // site can mint Turnstile tokens cross-origin. Token scope:
+  // Account > Turnstile > Edit (only).
+  CF_API_TOKEN?: string
+  CF_ACCOUNT_ID?: string
+  // Same string as the public site key in the widget bundle.
+  CF_TURNSTILE_WIDGET_ID?: string
 }
 
 // Typed view of the ambient env provided by cloudflare:workers.
