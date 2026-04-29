@@ -75,14 +75,15 @@ export function Widget(props: { onClose?: () => void; theme?: 'light' | 'dark' }
     if (result.ok) {
       setStep('sent')
     } else {
-      // Surface inline on the compose step so the user can fix-up
-      // and retry without losing what they typed. (Was setting
-      // step → 'sent' here, which trapped them on a success
-      // screen with an error message and the only way back was
-      // a button that wiped the textarea.)
+      // Surface the error inline on the compose step so the user
+      // can fix-up + retry without losing what they typed. (Was
+      // `setStep('sent')` here, which trapped the user on a
+      // success screen with an error message and no way back.)
       setErrorMessage(
         result.status === 429
           ? 'Too many submissions — try again in a minute.'
+          : result.status === 403
+          ? "Couldn't verify — please refresh and try again."
           : 'Could not send. Try again.',
       )
       setStep('compose')
