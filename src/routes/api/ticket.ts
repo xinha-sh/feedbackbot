@@ -9,7 +9,7 @@ import {
 } from '#/db/client'
 import { shouldBlockIngestionDomain } from '#/lib/blocklist'
 import { daySaltFor, ipHash } from '#/lib/crypto'
-import { domainFromHeader } from '#/lib/domain'
+import { domainFromHeader, sameRegistrableDomain } from '#/lib/domain'
 import { ApiError, apiError, corsHeadersFor, getClientIp, json, optionsResponse } from '#/lib/http'
 import { withRequestMetrics } from '#/lib/analytics'
 import { checkIpRate } from '#/do/rate-limiter'
@@ -73,6 +73,14 @@ async function handleSubmit(request: Request): Promise<Response> {
     // and any not-yet-configured stage stay functional. When it's
     // set, every submission must carry a fresh token (single-use
     // server-side — no caching, no retries).
+    //
+    // Token-hostname rebind: the siteverify response includes the
+    // hostname where the challenge was solved. We MUST compare it
+    // to the request's Origin, otherwise an attacker with their
+    // own verified workspace could mint a token from their own
+    // domain and replay it with a forged Origin to attack any
+    // other customer's workspace (since every verified customer's
+    // domain is on the same Cloudflare allowlist).
     if (env.TURNSTILE_SECRET) {
       if (!body.turnstile_token) {
         throw new ApiError(
@@ -92,6 +100,17 @@ async function handleSubmit(request: Request): Promise<Response> {
           domain,
         })
         throw new ApiError(403, 'turnstile failed', 'turnstile_failed')
+      }
+      if (!sameRegistrableDomain(verify.hostname, domain)) {
+        console.warn('turnstile hostname mismatch', {
+          token_hostname: verify.hostname,
+          request_domain: domain,
+        })
+        throw new ApiError(
+          403,
+          'turnstile hostname mismatch',
+          'turnstile_hostname_mismatch',
+        )
       }
     }
 

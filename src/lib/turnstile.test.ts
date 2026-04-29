@@ -13,12 +13,12 @@ describe('verifyTurnstile', () => {
     globalThis.fetch = realFetch
   })
 
-  it('returns ok:true for a valid token', async () => {
+  it('returns ok:true with hostname for a valid token', async () => {
     fetchMock.mockResolvedValueOnce({
-      json: async () => ({ success: true }),
+      json: async () => ({ success: true, hostname: 'peppyhop.com' }),
     })
     const result = await verifyTurnstile('tok', '1.2.3.4', 'secret')
-    expect(result).toEqual({ ok: true })
+    expect(result).toEqual({ ok: true, hostname: 'peppyhop.com' })
     const [, init] = fetchMock.mock.calls[0]!
     const body = (init as RequestInit).body as URLSearchParams
     expect(body.get('secret')).toBe('secret')
@@ -48,11 +48,19 @@ describe('verifyTurnstile', () => {
 
   it('omits remoteip when client IP is unknown', async () => {
     fetchMock.mockResolvedValueOnce({
-      json: async () => ({ success: true }),
+      json: async () => ({ success: true, hostname: 'peppyhop.com' }),
     })
     await verifyTurnstile('tok', 'unknown', 'secret')
     const [, init] = fetchMock.mock.calls[0]!
     const body = (init as RequestInit).body as URLSearchParams
     expect(body.has('remoteip')).toBe(false)
+  })
+
+  it('returns empty hostname when CF omits it', async () => {
+    fetchMock.mockResolvedValueOnce({
+      json: async () => ({ success: true }),
+    })
+    const result = await verifyTurnstile('tok', '1.2.3.4', 'secret')
+    expect(result).toEqual({ ok: true, hostname: '' })
   })
 })

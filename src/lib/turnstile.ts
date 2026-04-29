@@ -7,7 +7,7 @@
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 
 export type VerifyResult =
-  | { ok: true }
+  | { ok: true; hostname: string }
   | { ok: false; codes: Array<string> }
 
 export async function verifyTurnstile(
@@ -27,9 +27,10 @@ export async function verifyTurnstile(
     })
     const data = (await res.json()) as {
       success: boolean
+      hostname?: string
       'error-codes'?: Array<string>
     }
-    if (data.success) return { ok: true }
+    if (data.success) return { ok: true, hostname: data.hostname ?? '' }
     return { ok: false, codes: data['error-codes'] ?? ['unknown'] }
   } catch {
     return { ok: false, codes: ['network-error'] }

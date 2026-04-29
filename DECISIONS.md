@@ -343,3 +343,40 @@ surprised.
      **CF widget hostnames PATCHed (this change)**
   4. Install snippet → widget mints Turnstile tokens that
      siteverify with the correct hostname
+
+---
+
+## 2026-04-29 — Turnstile token-hostname rebind (security fix)
+
+While reviewing the auto-add-hostname design we found a real
+loophole: `verifyTurnstile` was throwing away the `hostname`
+field of the siteverify response, so a paying customer could mint
+a real Turnstile token from their own verified domain
+(`evil.com`), then replay it against `/api/ticket` with a forged
+`Origin: peppyhop.com` header to inject spam tickets into another
+customer's workspace.
+
+This works because every verified customer's domain ends up on
+the same Cloudflare allowlist (per the auto-add design), so
+Cloudflare itself can't reject the cross-customer replay — it's
+on us to bind the token to its origin.
+
+**Fix**: `verifyTurnstile` returns `{ ok: true, hostname: string }`
+on success. The `/api/ticket` handler runs
+`sameRegistrableDomain(verify.hostname, origin_domain)` and 403s
+on mismatch (`turnstile_hostname_mismatch`). Subdomains share a
+registrable domain, so a token minted on `peppyhop.com` is valid
+for requests Origined from `app.peppyhop.com` (and vice versa).
+
+**Other findings flagged but deferred**:
+- `/api/comment` and `/api/vote` are also widget-callable but
+  don't run the Turnstile gate. Lower-stakes (comment-on-ticket,
+  vote-toggle), but worth a follow-up to copy the pattern.
+- Auto-create pending workspaces on first `/api/ticket` ingestion
+  predates this PR. With Turnstile on, a hostname-mismatch reject
+  happens before any DB write, so pending-workspace abuse via
+  this path is no longer a concern.
+- Long-tail churn (a customer's verified domain gets bought by a
+  spammer after the company shuts down) leaves the hostname on
+  the CF allowlist permanently. Mitigation = periodic re-verify;
+  out of scope.
