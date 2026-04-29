@@ -19,6 +19,7 @@ import {
   type TicketSubmitResponse,
 } from '#/schema/ticket'
 import { buildUploadUrl, mintScreenshotToken } from '#/lib/screenshot-token'
+import { verifyTurnstile } from '#/lib/turnstile'
 
 const postTicket = withRequestMetrics('/api/ticket', handleSubmit)
 
@@ -67,6 +68,32 @@ async function handleSubmit(request: Request): Promise<Response> {
     // 4. IP hash (rotates daily; no raw IP in DB).
     const ip = getClientIp(request)
     const hash = await ipHash(ip, daySaltFor(new Date(), env.HMAC_SECRET_SEED))
+
+    // 4a. Turnstile gate. Bypass when secret is unset so local dev
+    // and any not-yet-configured stage stay functional. When it's
+    // set, every submission must carry a fresh token (single-use
+    // server-side — no caching, no retries).
+    if (env.TURNSTILE_SECRET) {
+      if (!body.turnstile_token) {
+        throw new ApiError(
+          403,
+          'turnstile token required',
+          'turnstile_required',
+        )
+      }
+      const verify = await verifyTurnstile(
+        body.turnstile_token,
+        ip,
+        env.TURNSTILE_SECRET,
+      )
+      if (!verify.ok) {
+        console.warn('turnstile rejected', {
+          codes: verify.codes,
+          domain,
+        })
+        throw new ApiError(403, 'turnstile failed', 'turnstile_failed')
+      }
+    }
 
     // 5. IP rate limit.
     const ipCheck = await checkIpRate(env.RATE_LIMITER, hash)

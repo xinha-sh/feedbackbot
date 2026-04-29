@@ -100,6 +100,10 @@ const DODO_PAYMENTS_WEBHOOK_SECRET = optionalSecret(
 )
 const DODO_PAYMENTS_ENV = process.env.DODO_PAYMENTS_ENV ?? 'test_mode'
 const RESEND_API_KEY = optionalSecret('RESEND_API_KEY')
+// Cloudflare Turnstile — gates /api/ticket. Unset → graceful
+// bypass. Site key (public) is read separately by the widget
+// build via VITE_FB_TURNSTILE_SITEKEY.
+const TURNSTILE_SECRET = optionalSecret('TURNSTILE_SECRET')
 // `||` not `??` — an unset GitHub secret resolves to an empty string
 // (not undefined), so `??` would let "" through and we'd POST
 // `from: ""` to Resend (422 "domain is invalid"). Falsy fallback
@@ -334,6 +338,7 @@ export const mainApp = await TanStackStart(APP_WORKER_ID, {
     DODO_PAYMENTS_ENV,
     RESEND_API_KEY,
     RESEND_FROM,
+    TURNSTILE_SECRET,
   },
 })
 

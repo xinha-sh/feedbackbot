@@ -48,6 +48,10 @@ export interface Env {
   // notifications. Verified domain configured at resend.com.
   RESEND_API_KEY?: string
   RESEND_FROM?: string // "FeedbackBot <noreply@usefeedbackbot.com>"
+  // Cloudflare Turnstile — gates /api/ticket. Unset → graceful
+  // bypass (same pattern as Dodo). Public site key is baked into
+  // the widget bundle, not here.
+  TURNSTILE_SECRET?: string
 }
 
 // Typed view of the ambient env provided by cloudflare:workers.

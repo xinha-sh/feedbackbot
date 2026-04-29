@@ -242,3 +242,55 @@ customer domain it's embedded on.
 URL (no content-hash cache busting). Acceptable for now — we set a
 short Cache-Control on `/widget.js` and a long one on the bundle
 contents only once we move to a CDN subdomain. That's deferred.
+
+---
+
+## 2026-04-29 — Anti-spam: Turnstile, not required email
+
+User asked whether the widget would attract spam now that
+`/api/ticket` is reachable, and named two options: Cloudflare
+Turnstile vs. requiring an email field.
+
+**Picked Turnstile**, declined required-email:
+- Required email contradicts the *zero-signup feedback* premise
+  and barely raises the bar (spammers can supply emails).
+- Turnstile is free, native to Workers, and invisible by default
+  for legit users (Cloudflare-managed challenge mode).
+
+**Deployment shape**:
+- `TURNSTILE_SECRET` is a server secret (`alchemy.optionalSecret`).
+  Unset → `/api/ticket` bypasses the gate (graceful mode, same
+  pattern as Dodo). Set → every submission must carry a fresh
+  token; server siteverifies via
+  `https://challenges.cloudflare.com/turnstile/v0/siteverify` BEFORE
+  the per-IP DO rate-limit so failed tokens don't burn DO units.
+- `VITE_FB_TURNSTILE_SITEKEY` is a public site key baked into
+  `public/widget.js` at build time via Vite `define`. Empty string
+  disables the client-side mint (`TURNSTILE_ENABLED = false`); the
+  Turnstile script is never lazy-loaded in graceful mode, so the
+  widget makes one fewer network request when Turnstile is off.
+- Tokens are minted **per submit** (not per panel-open) — avoids
+  the 5-min token-expiry edge case at the cost of one extra
+  challenge per submission. Cloudflare's invisible mode resolves
+  in <100ms for legit users.
+- Both knobs default OFF — turning them ON is a single env-var
+  flip per stage, no code change.
+
+**Layered defense** (existing, retained):
+1. Origin/Referer required → registrable domain (`src/lib/domain.ts`)
+2. Origin domain blocklist (freemail / disposable, KV-backed)
+3. Honeypot (silent fake-success on non-empty)
+4. **Turnstile (this change)**
+5. Per-IP DO sliding window (20/hr)
+6. Per-workspace DO hourly + monthly + pending caps (plan-aware)
+
+**Trade-off accepted**: Turnstile tokens are single-use; if we ever
+add an internal POST-retry to `/api/ticket` we'd hit
+`timeout-or-duplicate` on the second siteverify. Today nothing
+retries — `verifyTurnstile()` carries a doc comment to flag it for
+future readers.
+
+**Out of scope**: email-address blocklist, hCaptcha (we're on CF —
+Turnstile is the obvious choice), tightening pending-workspace
+auto-creation. All deferred until production data shows we still
+have noise.

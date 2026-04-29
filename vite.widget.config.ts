@@ -7,6 +7,12 @@
 
 import { defineConfig } from 'vite'
 
+// Public Turnstile site key — baked into the bundle. Empty string
+// means Turnstile is OFF for this build (graceful mode: widget
+// submits without a token, server bypasses the gate when
+// TURNSTILE_SECRET is also unset).
+const TURNSTILE_SITEKEY = process.env.VITE_FB_TURNSTILE_SITEKEY ?? ''
+
 export default defineConfig({
   // Disable the default public-dir copy step — outDir IS public/, so
   // the copy would either no-op or chase its own tail. We only want
@@ -35,6 +41,12 @@ export default defineConfig({
       },
     },
     reportCompressedSize: true,
+  },
+  define: {
+    // Bare identifier (NOT wrapped in quotes in source) so Vite's
+    // define-substitution actually fires. The wrapped-in-quotes
+    // form fails silently — see DECISIONS.md 2026-04-29.
+    __FB_TURNSTILE_SITEKEY__: JSON.stringify(TURNSTILE_SITEKEY),
   },
   esbuild: {
     jsx: 'automatic',
