@@ -69,10 +69,14 @@ async function handleSubmit(request: Request): Promise<Response> {
     const ip = getClientIp(request)
     const hash = await ipHash(ip, daySaltFor(new Date(), env.HMAC_SECRET_SEED))
 
-    // 4a. Turnstile gate. Bypass when secret is unset so local dev
-    // and any not-yet-configured stage stay functional. When it's
-    // set, every submission must carry a fresh token (single-use
-    // server-side — no caching, no retries).
+    // 4a. Turnstile gate. Activated only when BOTH the server-side
+    // secret AND the public widget id are set — the widget can't
+    // mint tokens without the sitekey baked into its bundle, so
+    // enforcing the gate without `CF_TURNSTILE_WIDGET_ID` would
+    // 403 every legitimate submission. The two-key precondition
+    // is also our config-drift guardrail: if an operator only
+    // half-configures Turnstile, we fall back to graceful mode
+    // instead of bricking ingest.
     //
     // Token-hostname rebind: the siteverify response includes the
     // hostname where the challenge was solved. We MUST compare it
@@ -81,7 +85,7 @@ async function handleSubmit(request: Request): Promise<Response> {
     // domain and replay it with a forged Origin to attack any
     // other customer's workspace (since every verified customer's
     // domain is on the same Cloudflare allowlist).
-    if (env.TURNSTILE_SECRET) {
+    if (env.TURNSTILE_SECRET && env.CF_TURNSTILE_WIDGET_ID) {
       if (!body.turnstile_token) {
         throw new ApiError(
           403,
