@@ -7,11 +7,15 @@
 
 import { defineConfig } from 'vite'
 
-// Public Turnstile site key — baked into the bundle. Empty string
-// means Turnstile is OFF for this build (graceful mode: widget
-// submits without a token, server bypasses the gate when
+// Public Turnstile site key — baked into the bundle. Same value
+// the worker reads at runtime via `env.CF_TURNSTILE_WIDGET_ID`
+// (the CF API addresses the widget by its site key, so site-key
+// and widget-id are literally the same string). One env var, two
+// contexts — avoids a duplicated-secret-that-can-drift trap.
+// Empty string → Turnstile OFF (graceful mode: widget submits
+// without a token, server bypasses the gate when
 // TURNSTILE_SECRET is also unset).
-const TURNSTILE_SITEKEY = process.env.VITE_FB_TURNSTILE_SITEKEY ?? ''
+const TURNSTILE_SITEKEY = process.env.CF_TURNSTILE_WIDGET_ID ?? ''
 
 export default defineConfig({
   // Disable the default public-dir copy step — outDir IS public/, so

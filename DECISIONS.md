@@ -380,3 +380,27 @@ for requests Origined from `app.peppyhop.com` (and vice versa).
   spammer after the company shuts down) leaves the hostname on
   the CF allowlist permanently. Mitigation = periodic re-verify;
   out of scope.
+
+---
+
+## 2026-05-01 — Turnstile site key: one env var, two contexts
+
+User flagged duplication: we had `VITE_FB_TURNSTILE_SITEKEY`
+(build-time, baked into widget.js) AND `CF_TURNSTILE_WIDGET_ID`
+(runtime, used by the admin PATCH against Cloudflare's API). Both
+hold the same string — Cloudflare's Turnstile API addresses the
+widget by its site key, so "site key" and "widget id" are
+literally the same value. Two names = two places to forget to
+update.
+
+**Collapsed to a single env var: `CF_TURNSTILE_WIDGET_ID`.** Vite
+`define` doesn't require the `VITE_` prefix (it's a Vite
+*convention* for client-exposed vars, not an enforced rule).
+`vite.widget.config.ts` now reads `process.env.CF_TURNSTILE_WIDGET_ID`
+at build time, and the worker reads `env.CF_TURNSTILE_WIDGET_ID`
+at runtime. Same string, one source of truth.
+
+We don't have varlock or a similar schema validator wired up here
+(despite a passing impression we did) — would be the right next
+step if env-var hygiene becomes a recurring theme. Today's
+defense is just keeping the var count low.
