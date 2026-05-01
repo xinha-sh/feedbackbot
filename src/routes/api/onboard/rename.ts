@@ -15,8 +15,11 @@ import { z } from 'zod'
 import { env } from '#/env'
 import { makeDb } from '#/db/client'
 import {
+  comments,
   member,
   organization as orgTable,
+  tickets,
+  votes,
   workspaces,
 } from '#/db/schema'
 import { newId } from '#/db/ids'
@@ -84,14 +87,72 @@ async function handle(request: Request): Promise<Response> {
       throw new ApiError(403, 'not a member', 'not_member')
     }
 
-    // Uniqueness check — reject fast with a helpful message.
+    // Uniqueness check + orphan auto-merge.
+    //
+    // The widget snippet on a customer's site can land before the
+    // customer pays — the auto-create-on-first-/api/ticket path
+    // creates an unclaimed, unsubscribed pending workspace keyed
+    // by their origin domain. When that customer later signs up
+    // and tries to link the same domain to their paid workspace,
+    // the lookup hits the orphan and would 409 without this merge.
+    //
+    // Merge rule: an existing workspace at this domain is safe to
+    // absorb iff it has NO subscription_id AND state='pending'.
+    // Anything else is a real, paying customer's claim — keep the
+    // 409.
     const existing = await db
-      .select({ id: workspaces.id })
+      .select({
+        id: workspaces.id,
+        state: workspaces.state,
+        subscriptionId: workspaces.subscriptionId,
+        ticketCount: workspaces.ticketCount,
+      })
       .from(workspaces)
       .where(eq(workspaces.domain, domain))
       .limit(1)
     if (existing.length > 0 && existing[0]!.id !== ws.id) {
-      throw new ApiError(409, 'domain already in use', 'domain_taken')
+      const orphan = existing[0]!
+      const isOrphan =
+        orphan.state === 'pending' && !orphan.subscriptionId
+      if (!isOrphan) {
+        throw new ApiError(409, 'domain already in use', 'domain_taken')
+      }
+      // Merge: re-parent any tickets/comments/votes the orphan
+      // collected onto the caller's workspace, bump the caller's
+      // ticket_count by the orphan's, then delete the orphan.
+      // Done in a batch so partial failure leaves the orphan in
+      // place rather than orphaning the orphan's children.
+      await db.batch([
+        db
+          .update(tickets)
+          .set({ workspaceId: ws.id })
+          .where(eq(tickets.workspaceId, orphan.id)),
+        db
+          .update(comments)
+          .set({ workspaceId: ws.id })
+          .where(eq(comments.workspaceId, orphan.id)),
+        db
+          .update(votes)
+          .set({ workspaceId: ws.id })
+          .where(eq(votes.workspaceId, orphan.id)),
+        db
+          .update(workspaces)
+          .set({
+            ticketCount: ws.ticketCount + orphan.ticketCount,
+          })
+          .where(eq(workspaces.id, ws.id)),
+        db.delete(workspaces).where(eq(workspaces.id, orphan.id)),
+      ])
+      await writeAudit(db, {
+        workspaceId: ws.id,
+        action: 'workspace.merge.orphan',
+        actorUserId: userId,
+        metadata: {
+          domain,
+          merged_workspace_id: orphan.id,
+          merged_ticket_count: orphan.ticketCount,
+        },
+      })
     }
 
     const newToken = newId.verificationToken()
