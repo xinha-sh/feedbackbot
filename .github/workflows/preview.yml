@@ -58,11 +58,14 @@ jobs:
       DODO_TEST_API_KEY: ${{ secrets.DODO_TEST_API_KEY }}
       # Cloudflare Turnstile — anti-spam gate on /api/ticket plus
       # auto-add of customer hostnames on DNS verification. Both
-      # default OFF in graceful mode, so unset is fine.
+      # default OFF in graceful mode, so unset is fine. Site key
+      # (CF_TURNSTILE_WIDGET_ID) is public — stored as a secret
+      # here only because that's how it was set up; functionally
+      # fine since it ends up baked into widget.js.
       TURNSTILE_SECRET: ${{ secrets.TURNSTILE_SECRET }}
       CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
       CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-      CF_TURNSTILE_WIDGET_ID: ${{ vars.CF_TURNSTILE_WIDGET_ID }}
+      CF_TURNSTILE_WIDGET_ID: ${{ secrets.CF_TURNSTILE_WIDGET_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -133,6 +136,13 @@ jobs:
                 body,
               })
             }
+
+      # Build the widget bundle from source. Reads
+      # CF_TURNSTILE_WIDGET_ID from the env block above and bakes
+      # it into public/widget.js so the deployed bundle and the
+      # server gate are always config-coherent.
+      - name: Build widget bundle
+        run: pnpm build:widget
 
       - name: Deploy preview
         id: deploy

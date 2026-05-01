@@ -37,11 +37,14 @@ jobs:
       SLACK_CLIENT_SECRET: ${{ secrets.SLACK_CLIENT_SECRET }}
       # Cloudflare Turnstile — anti-spam gate on /api/ticket plus
       # auto-add of customer hostnames on DNS verification. Both
-      # default OFF in graceful mode, so unset is fine.
+      # default OFF in graceful mode, so unset is fine. The site
+      # key (CF_TURNSTILE_WIDGET_ID) is public — stored as a
+      # secret here only because that's how it was set up;
+      # functionally fine since it ends up baked into widget.js.
       TURNSTILE_SECRET: ${{ secrets.TURNSTILE_SECRET }}
       CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
       CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-      CF_TURNSTILE_WIDGET_ID: ${{ vars.CF_TURNSTILE_WIDGET_ID }}
+      CF_TURNSTILE_WIDGET_ID: ${{ secrets.CF_TURNSTILE_WIDGET_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -64,6 +67,15 @@ jobs:
         run: |
           pnpm exec tsc --noEmit
           pnpm test
+
+      # Build the widget bundle from source. Reads
+      # CF_TURNSTILE_WIDGET_ID from the env block above and bakes
+      # it into public/widget.js so the deployed bundle and the
+      # server gate are always config-coherent. (Was committed-
+      # to-repo previously, which let the bundle drift out of
+      # sync with the server's env vars and broke prod.)
+      - name: Build widget bundle
+        run: pnpm build:widget
 
       - name: Deploy production
         run: pnpm exec alchemy deploy --stage production

@@ -31,3 +31,4 @@ todos.json
 # IDE
 .vscode/
 .claude/
+/public/widget.js
