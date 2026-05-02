@@ -47,11 +47,19 @@ describe('addTurnstileHostname', () => {
     return { ok: false, status, json: async () => json }
   }
 
-  it('GETs current domains, PATCHes with merged list, returns ok:true', async () => {
+  it('GETs current widget, PUTs full body with merged list', async () => {
     fetchMock
-      .mockResolvedValueOnce(ok({ success: true, result: { domains: ['a.com'] } }))
       .mockResolvedValueOnce(
-        ok({ success: true, result: { domains: ['a.com', 'b.com'] } }),
+        ok({
+          success: true,
+          result: { name: 'fb', mode: 'managed', domains: ['a.com'] },
+        }),
+      )
+      .mockResolvedValueOnce(
+        ok({
+          success: true,
+          result: { name: 'fb', mode: 'managed', domains: ['a.com', 'b.com'] },
+        }),
       )
     const result = await addTurnstileHostname('b.com', ENV)
     expect(result.ok).toBe(true)
@@ -59,6 +67,18 @@ describe('addTurnstileHostname', () => {
       expect(new Set(result.hostnames)).toEqual(new Set(['a.com', 'b.com']))
       expect(result.alreadyPresent).toBe(false)
     }
+    // Confirm we used PUT (not PATCH) AND round-tripped the full
+    // widget body — CF resets unsent fields on a PUT, so dropping
+    // `name`/`mode` would silently break customers' widget config.
+    const putCall = fetchMock.mock.calls[1]!
+    const init = putCall[1] as RequestInit
+    expect(init.method).toBe('PUT')
+    const body = JSON.parse(init.body as string)
+    expect(body).toMatchObject({
+      name: 'fb',
+      mode: 'managed',
+      domains: ['a.com', 'b.com'],
+    })
   })
 
   it('skips PATCH when domain already on the list', async () => {
