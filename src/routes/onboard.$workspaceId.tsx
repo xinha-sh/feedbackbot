@@ -45,6 +45,11 @@ type RenameResponse = {
   verification_token: string
   record_name: string
   record_value: string
+  // True when the rename also auto-claimed the workspace via
+  // email-match (server-side check that session.user.email
+  // shares a registrable domain with the linked domain). Lets
+  // the UI skip the verify-DNS step.
+  claimed?: boolean
 }
 
 type VerifyResponse = {
@@ -130,7 +135,14 @@ function OnboardPage() {
         {stage === 'enter_domain' && workspace && (
           <EnterDomainStep
             workspaceId={workspaceId}
-            onDone={() => me.refetch()}
+            onDone={(opts) => {
+              // Email-match auto-claim: rename succeeded AND the
+              // server flipped the workspace to claimed in one
+              // shot. Skip the verify-DNS screen by jumping
+              // straight to connect-widget.
+              if (opts.claimed) setConnectStep(true)
+              me.refetch()
+            }}
           />
         )}
 
@@ -234,7 +246,7 @@ function EnterDomainStep({
   onDone,
 }: {
   workspaceId: string
-  onDone: () => void
+  onDone: (opts: { claimed: boolean }) => void
 }) {
   const [domain, setDomain] = useState('')
 
@@ -252,7 +264,7 @@ function EnterDomainStep({
       }
       return (await res.json()) as RenameResponse
     },
-    onSuccess: () => onDone(),
+    onSuccess: (data) => onDone({ claimed: !!data.claimed }),
   })
 
   return (

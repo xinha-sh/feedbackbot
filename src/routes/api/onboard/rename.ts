@@ -19,11 +19,13 @@ import {
   member,
   organization as orgTable,
   tickets,
+  user,
   votes,
   workspaces,
 } from '#/db/schema'
 import { newId } from '#/db/ids'
-import { normalizeDomain } from '#/lib/domain'
+import { normalizeDomain, sameRegistrableDomain } from '#/lib/domain'
+import { isFreemail, isStrict } from '#/lib/blocklist'
 import {
   ApiError,
   apiError,
@@ -34,6 +36,7 @@ import {
 import { withRequestMetrics } from '#/lib/analytics'
 import { requireSession } from '#/lib/admin-auth'
 import { writeAudit } from '#/db/client'
+import { addTurnstileHostname } from '#/lib/turnstile-admin'
 
 const RenameSchema = z.object({
   workspace_id: z.string().min(1),
@@ -184,6 +187,56 @@ async function handle(request: Request): Promise<Response> {
       metadata: { from: ws.domain, to: domain },
     })
 
+    // Auto-claim shortcut: if the signed-in user's email is on the
+    // domain they just linked, skip DNS. Their email was already
+    // verified by the payment flow (Dodo accepted payment to it),
+    // and the email match is via session — can't be forged. Saves
+    // a round-trip through DNS-TXT for the common case where the
+    // owner uses an email at their own domain.
+    //
+    // Strict TLDs (edu / gov / mil) are excluded — we want a real
+    // DNS proof for those. Freemail domains can't reach here in
+    // the first place (ingest blocks freemail Origins).
+    let claimed = false
+    const userRows = await db
+      .select({ email: user.email, emailVerified: user.emailVerified })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1)
+    const userEmail = userRows[0]?.email ?? null
+    const emailVerified = userRows[0]?.emailVerified ?? false
+    if (userEmail && emailVerified) {
+      const userDomain = userEmail.split('@')[1] ?? ''
+      const matches = sameRegistrableDomain(userDomain, domain)
+      const blockedTld = await isStrict(env.BLOCKLIST_KV, domain).catch(
+        () => false,
+      )
+      const freemail = await isFreemail(env.BLOCKLIST_KV, domain).catch(
+        () => false,
+      )
+      if (matches && !blockedTld && !freemail) {
+        const now = Date.now()
+        await db
+          .update(workspaces)
+          .set({ state: 'claimed', claimedAt: now })
+          .where(eq(workspaces.id, ws.id))
+        await writeAudit(db, {
+          workspaceId: ws.id,
+          action: 'workspace.claim.email_match',
+          actorUserId: userId,
+          metadata: { domain, method: 'email_match', user_email: userEmail },
+        })
+        // Best-effort: add the domain to the Turnstile widget's
+        // hostname allowlist so the customer's site can mint
+        // tokens. Mirror of what verify-domain does.
+        const turnstileOk = await addTurnstileHostname(domain, env)
+        if (!turnstileOk) {
+          console.warn('turnstile hostname add failed', { domain })
+        }
+        claimed = true
+      }
+    }
+
     return json(
       {
         workspace_id: ws.id,
@@ -191,6 +244,7 @@ async function handle(request: Request): Promise<Response> {
         verification_token: newToken,
         record_name: `_feedback.${domain}`,
         record_value: `feedback-verify=${newToken}`,
+        claimed,
       },
       { headers: cors },
     )
