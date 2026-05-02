@@ -126,7 +126,8 @@ export async function addTurnstileHostname(
         lastErr = { ok: false, reason: 'cf_api_error', details: data.errors }
         break
       }
-      const current = new Set(data.result?.domains ?? [])
+      const widget = (data.result ?? {}) as Record<string, unknown> & CfWidget
+      const current = new Set(widget.domains ?? [])
       if (current.has(domain)) {
         return {
           ok: true,
@@ -136,30 +137,34 @@ export async function addTurnstileHostname(
       }
       current.add(domain)
 
-      // 2) PATCH with merged hostnames.
-      const patchRes = await cfFetch(widgetUrl, {
-        method: 'PATCH',
+      // 2) PUT the full widget back with the updated domains.
+      // Cloudflare's Turnstile API doesn't accept PATCH for token-
+      // authenticated calls (returns code 10405) — full PUT only.
+      // The body has to round-trip every existing field (name,
+      // mode, bot_fight_mode, etc.) or CF resets the unsent ones.
+      const putRes = await cfFetch(widgetUrl, {
+        method: 'PUT',
         headers: { ...auth, 'content-type': 'application/json' },
-        body: JSON.stringify({ domains: Array.from(current) }),
+        body: JSON.stringify({ ...widget, domains: Array.from(current) }),
       })
-      if (!patchRes.ok) {
-        const { reason, retry } = classify(patchRes.status)
-        lastErr = { ok: false, reason, details: patchRes.body }
+      if (!putRes.ok) {
+        const { reason, retry } = classify(putRes.status)
+        lastErr = { ok: false, reason, details: putRes.body }
         if (!retry) break
         continue
       }
-      const patchData = patchRes.data as CfApiResponse<CfWidget>
-      if (!patchData.success) {
+      const putData = putRes.data as CfApiResponse<CfWidget>
+      if (!putData.success) {
         lastErr = {
           ok: false,
           reason: 'cf_api_error',
-          details: patchData.errors,
+          details: putData.errors,
         }
         break
       }
       return {
         ok: true,
-        hostnames: patchData.result?.domains ?? Array.from(current),
+        hostnames: putData.result?.domains ?? Array.from(current),
         alreadyPresent: false,
       }
     } catch (err) {
