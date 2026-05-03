@@ -22,7 +22,7 @@ const searchSchema = z
 
 type IntegrationRow = {
   id: string
-  kind: 'webhook' | 'slack'
+  kind: 'webhook' | 'slack' | 'discord'
   name: string
   enabled: boolean
   createdAt: number
@@ -150,6 +150,11 @@ function IntegrationsPage() {
       )}
 
       <SlackInstallCard domain={domain} />
+      <DiscordForm
+        onSubmit={(body) => create.mutate(body)}
+        pending={create.isPending}
+        errorMessage={create.error ? (create.error as Error).message : undefined}
+      />
       <WebhookForm
         onSubmit={(body) => create.mutate(body)}
         pending={create.isPending}
@@ -291,9 +296,13 @@ function IntegrationCard({
               domain={domain}
             />
           ) : (
+            // Webhook + Discord share the same editor UI: per-ticket-
+            // type toggle + test-send button. Discord just hides the
+            // signature-verify hint at the bottom (no HMAC).
             <WebhookEditor
               integrationId={integration.id}
               domain={domain}
+              kind={integration.kind}
             />
           )}
         </div>
@@ -507,9 +516,11 @@ function SlackRoutesEditor({
 function WebhookEditor({
   integrationId,
   domain,
+  kind,
 }: {
   integrationId: string
   domain: string
+  kind: 'webhook' | 'discord'
 }) {
   const qc = useQueryClient()
   const routes = useIntegrationRoutes(integrationId, domain)
@@ -709,6 +720,7 @@ function WebhookEditor({
         )}
       </div>
 
+      {kind === 'webhook' && (
       <details
         style={{
           fontSize: 13,
@@ -740,6 +752,7 @@ expect = hmac_sha256_hex(WEBHOOK_SECRET, ts + "." + body)
 if not constant_time_eq(sig, expect): reject 401
 if abs(now() - int(ts)) > 300: reject 401  # replay window`}</pre>
       </details>
+      )}
     </div>
   )
 }
@@ -800,6 +813,142 @@ function SlackInstallCard({ domain }: { domain: string }) {
         >
           Install Slack <ExternalLink size={12} strokeWidth={2} />
         </Btn>
+      </div>
+    </div>
+  )
+}
+
+function DiscordForm({
+  onSubmit,
+  pending,
+  errorMessage,
+}: {
+  onSubmit: (body: IntegrationCreate) => void
+  pending: boolean
+  errorMessage?: string
+}) {
+  const [name, setName] = useState('')
+  const [url, setUrl] = useState('')
+  const [kinds, setKinds] = useState<Record<TicketKind, boolean>>({
+    bug: true,
+    feature: true,
+    query: false,
+  })
+
+  // Discord webhook URLs all start with discord.com/api/webhooks/.
+  // Reject anything else early so the user gets a useful inline
+  // error instead of a 400 from the API.
+  const urlOk = /^https:\/\/(?:[a-z]+\.)?discord(?:app)?\.com\/api\/webhooks\//.test(
+    url.trim(),
+  )
+  const canSubmit = name.trim().length > 0 && urlOk
+
+  const submit = () => {
+    if (!canSubmit) return
+    onSubmit({
+      name: name.trim(),
+      creds: { kind: 'discord', webhook_url: url.trim() },
+      routes: TICKET_KINDS.filter((k) => kinds[k]).map((k) => ({
+        ticket_type: k,
+        config: {},
+      })),
+    })
+    setName('')
+    setUrl('')
+  }
+
+  return (
+    <div className="hi-card hi-card-raised" style={{ padding: 20, marginBottom: 20 }}>
+      <div
+        className="h-mono"
+        style={{
+          fontSize: 11,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'var(--fg-mute)',
+          marginBottom: 10,
+        }}
+      >
+        Add a Discord channel
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--fg-mute)', marginBottom: 12, lineHeight: 1.5 }}>
+        In Discord: <strong>Server settings → Integrations → Webhooks → New
+        Webhook</strong>, pick the channel, then <em>Copy Webhook URL</em>
+        and paste below.
+      </div>
+      <div style={{ display: 'grid', gap: 10 }}>
+        <Field label="name">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="#feedback"
+            style={fieldStyle}
+          />
+        </Field>
+        <Field label="webhook url">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://discord.com/api/webhooks/…"
+            style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }}
+          />
+        </Field>
+        {url.trim().length > 0 && !urlOk && (
+          <div style={{ color: 'var(--danger)', fontSize: 12 }}>
+            That doesn't look like a Discord webhook URL.
+          </div>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+          }}
+        >
+          <span
+            className="h-mono"
+            style={{
+              fontSize: 11,
+              color: 'var(--fg-faint)',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}
+          >
+            deliver
+          </span>
+          {TICKET_KINDS.map((k) => (
+            <label
+              key={k}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={kinds[k]}
+                onChange={(e) =>
+                  setKinds({ ...kinds, [k]: e.currentTarget.checked })
+                }
+              />
+              {k}
+            </label>
+          ))}
+        </div>
+        {errorMessage && (
+          <div style={{ color: 'var(--danger)', fontSize: 13 }}>
+            {errorMessage}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Btn variant="primary" onClick={submit} disabled={!canSubmit || pending}>
+            {pending ? 'Adding…' : 'Add Discord'}
+          </Btn>
+        </div>
       </div>
     </div>
   )

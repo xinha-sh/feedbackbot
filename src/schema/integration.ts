@@ -3,7 +3,7 @@ import { ClassificationKindSchema } from './ticket'
 
 // ── integration kinds ────────────────────────────────────────────
 
-export const IntegrationKinds = ['webhook', 'slack'] as const
+export const IntegrationKinds = ['webhook', 'slack', 'discord'] as const
 export const IntegrationKindSchema = z.enum(IntegrationKinds)
 export type IntegrationKind = z.infer<typeof IntegrationKindSchema>
 
@@ -20,9 +20,25 @@ const SlackCreds = z.object({
   team_id: z.string().min(1),
   team_name: z.string().optional(),
 })
+// Discord incoming webhooks are unauthenticated — the URL itself is
+// the secret. We narrow to the canonical Discord webhook host so a
+// pasted Slack/random URL fails validation early.
+const DiscordCreds = z.object({
+  kind: z.literal('discord'),
+  webhook_url: z
+    .string()
+    .url()
+    .refine(
+      (u) =>
+        /^https:\/\/(?:[a-z]+\.)?discord\.com\/api\/webhooks\//.test(u) ||
+        /^https:\/\/(?:[a-z]+\.)?discordapp\.com\/api\/webhooks\//.test(u),
+      'must be a https://discord.com/api/webhooks/... URL',
+    ),
+})
 export const IntegrationCredsSchema = z.discriminatedUnion('kind', [
   WebhookCreds,
   SlackCreds,
+  DiscordCreds,
 ])
 export type IntegrationCreds = z.infer<typeof IntegrationCredsSchema>
 
