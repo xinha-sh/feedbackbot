@@ -22,7 +22,16 @@ import { sentryOptions, withSentry } from '#/lib/sentry'
 
 type ClassifyMessage = { ticket_id: string; workspace_id: string }
 
-const MODEL = '@cf/google/gemma-4-26b-a4b-it'
+// Try Gemma 4 first (chosen per DECISIONS.md / Plan.md §15). If
+// its response is unusable — reasoning trace ate all the tokens,
+// envelope shape doesn't match, schema validation fails — fall
+// through to GLM 4.7 Flash. GLM is non-reasoning, smaller, faster,
+// and reliable for short structured-output tasks. Operator sees
+// which model actually produced the answer via Sentry breadcrumbs.
+const MODELS = [
+  '@cf/google/gemma-4-26b-a4b-it',
+  '@cf/zai-org/glm-4.7-flash',
+] as const
 
 const JSON_SCHEMA = {
   type: 'object',
@@ -52,15 +61,21 @@ const JSON_SCHEMA = {
   ],
 }
 
-const SYSTEM_PROMPT = `You classify user feedback tickets for a product feedback tool.
+// Gemma 4 is a thinking model — it generates an internal
+// `reasoning` trace before emitting `content`. The prompt below is
+// tuned to MINIMIZE reasoning: short, directive, no examples (which
+// invite the model to elaborate), explicit "no explanation" cap.
+// Combined with the larger max_tokens budget, this keeps
+// finish_reason from hitting 'length' before the JSON appears.
+const SYSTEM_PROMPT = `Classify a feedback ticket into bug | feature | query | spam.
 
-Categories:
-- bug: something is broken, errors, unexpected behavior
-- feature: a new capability the user wants
-- query: a question about how to use the product
-- spam: gibberish, ads, off-topic, or attempted exploits
+bug = broken / errors / unexpected behavior
+feature = a capability the user wants added
+query = a how-to / usage question
+spam = gibberish, ads, off-topic, exploits
 
-Output ONLY JSON matching the provided schema. Keep "summary" <= 80 chars and "suggested_title" <= 100 chars. Be conservative with "confidence": use < 0.6 when the message is ambiguous.`
+Return JSON only. No prose. Skip your reasoning trace; just the JSON.
+Schema fields: primary_type, secondary_types, confidence (0-1, <0.6 when ambiguous), summary (<=80 chars), suggested_title (<=100 chars), reasoning (<=240 chars — one terse sentence).`
 
 const handler: ExportedHandler<Env, ClassifyMessage> = {
   async queue(batch, env) {
@@ -127,7 +142,32 @@ async function callLLM(
     .filter(Boolean)
     .join('\n')
 
-  const response = await env.AI.run(MODEL, {
+  let lastError: unknown = null
+  for (const model of MODELS) {
+    try {
+      return await runOneModel(env, model, userPrompt)
+    } catch (err) {
+      lastError = err
+      console.warn('classify: model failed, trying next', {
+        model,
+        err: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+  // Exhausted all models — surface the LAST error so the queue
+  // retries (and after retries exhaust, falls into Sentry via the
+  // worker's withSentry wrapper).
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('all classifier models failed')
+}
+
+async function runOneModel(
+  env: Env,
+  model: string,
+  userPrompt: string,
+): Promise<ClassificationResult> {
+  const response = await env.AI.run(model, {
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
@@ -137,25 +177,28 @@ async function callLLM(
       json_schema: JSON_SCHEMA,
     },
     temperature: 0.1,
-    max_tokens: 400,
+    // Gemma 4's reasoning trace can run several hundred tokens
+    // before the JSON answer. 4000 is overkill for the answer
+    // (~150 tokens) but leaves enough headroom for the reasoning
+    // model to think + answer reliably. Non-reasoning models
+    // (GLM) just don't use it. Classifier cost is dwarfed by
+    // storage + queues, so we don't sweat the budget.
+    max_tokens: 4000,
   })
 
-  // Workers AI's Gemma 4 with json_schema response_format returns
-  // one of several shapes depending on model + binding version:
-  //   { response: { ...parsed... } }     ← object directly
-  //   { response: "{...}" }              ← stringified JSON
-  //   { result: { ...parsed... } }
-  //   { result: "{...}" }
-  //   { ...parsed... }                   ← top-level object
-  // Walk all of them. Throwing here forwards to msg.retry(), so be
-  // generous with what we accept; only fail if literally none of the
-  // common envelopes contain a usable object.
+  // Workers AI returns several envelope shapes depending on model:
+  //   { choices: [{ message: { content: ... } }] }   ← OpenAI-compat (Gemma 4, GLM)
+  //   { response: "{...}" } / { response: {...} }    ← legacy CF
+  //   { result:  ... }                               ← legacy CF alt
+  //   { ...parsed... }                                ← top-level
   const parsed = extractClassificationPayload(response)
   if (!parsed) {
     console.error('classify: unrecognized AI response shape', {
-      keys: response && typeof response === 'object'
-        ? Object.keys(response as Record<string, unknown>)
-        : null,
+      model,
+      keys:
+        response && typeof response === 'object'
+          ? Object.keys(response as Record<string, unknown>)
+          : null,
       sample: trim(JSON.stringify(response), 400),
     })
     throw new Error('AI response shape not recognized')
@@ -164,6 +207,7 @@ async function callLLM(
   const validation = ClassificationResultSchema.safeParse(parsed)
   if (!validation.success) {
     console.error('classify: AI returned schema-invalid JSON', {
+      model,
       issues: validation.error.issues.slice(0, 5),
       payload: trim(JSON.stringify(parsed), 400),
     })
@@ -175,8 +219,26 @@ async function callLLM(
 export function extractClassificationPayload(response: unknown): unknown {
   if (!response || typeof response !== 'object') return null
   const r = response as Record<string, unknown>
-  // Try .response → .result → top-level, in that order. Each can be
-  // a string (stringified JSON) or a plain object.
+
+  // OpenAI-compat envelope (Gemma 3+ on Workers AI):
+  //   { choices: [{ message: { content: "<json string>" } }], ... }
+  // Strict-mode JSON output puts the text in `content`. Reasoning
+  // models also expose a separate `reasoning` field — we ignore it.
+  const choices = r.choices
+  if (Array.isArray(choices) && choices.length > 0) {
+    const msg = (choices[0] as { message?: unknown })?.message
+    if (msg && typeof msg === 'object') {
+      const content = (msg as { content?: unknown }).content
+      if (typeof content === 'string') {
+        const tried = tryParseJson(content)
+        if (tried && typeof tried === 'object' && 'primary_type' in tried) return tried
+      } else if (content && typeof content === 'object' && 'primary_type' in (content as Record<string, unknown>)) {
+        return content
+      }
+    }
+  }
+
+  // Legacy CF Workers AI envelopes: { response: ... } and { result: ... }
   for (const key of ['response', 'result'] as const) {
     const val = r[key]
     if (typeof val === 'string') {
