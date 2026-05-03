@@ -36,6 +36,47 @@ describe('extractClassificationPayload', () => {
     expect(extractClassificationPayload(VALID)).toEqual(VALID)
   })
 
+  it('handles OpenAI-compat envelope (Gemma 3+ choices[0].message.content stringified)', () => {
+    const envelope = {
+      id: 'chatcmpl-x',
+      object: 'chat.completion',
+      created: 1700000000,
+      model: '@cf/google/gemma-3-12b-it',
+      choices: [
+        {
+          index: 0,
+          finish_reason: 'stop',
+          message: {
+            role: 'assistant',
+            content: JSON.stringify(VALID),
+          },
+        },
+      ],
+      usage: { prompt_tokens: 10, completion_tokens: 50, total_tokens: 60 },
+    }
+    expect(extractClassificationPayload(envelope)).toEqual(VALID)
+  })
+
+  it('handles OpenAI-compat envelope with object content (no string parse needed)', () => {
+    const envelope = {
+      choices: [{ message: { content: VALID } }],
+    }
+    expect(extractClassificationPayload(envelope)).toEqual(VALID)
+  })
+
+  it('returns null on OpenAI envelope where the model ran out of tokens (content: null)', () => {
+    // Real failure mode we hit on Gemma 4 with finish_reason='length'.
+    const envelope = {
+      choices: [
+        {
+          finish_reason: 'length',
+          message: { content: null, reasoning: 'thinking out loud...' },
+        },
+      ],
+    }
+    expect(extractClassificationPayload(envelope)).toBeNull()
+  })
+
   it('returns null on unrecognized envelope', () => {
     expect(extractClassificationPayload({ foo: 'bar' })).toBeNull()
     expect(extractClassificationPayload(null)).toBeNull()
