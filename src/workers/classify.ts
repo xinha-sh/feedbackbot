@@ -22,16 +22,14 @@ import { sentryOptions, withSentry } from '#/lib/sentry'
 
 type ClassifyMessage = { ticket_id: string; workspace_id: string }
 
-// Try Gemma 4 first (chosen per DECISIONS.md / Plan.md §15). If
-// its response is unusable — reasoning trace ate all the tokens,
-// envelope shape doesn't match, schema validation fails — fall
-// through to GLM 4.7 Flash. GLM is non-reasoning, smaller, faster,
-// and reliable for short structured-output tasks. Operator sees
-// which model actually produced the answer via Sentry breadcrumbs.
-const MODELS = [
-  '@cf/google/gemma-4-26b-a4b-it',
-  '@cf/zai-org/glm-4.7-flash',
-] as const
+// GLM 4.7 Flash. Tried Gemma 4 (per Plan.md §15) but it's a
+// reasoning model that consumed its entire token budget on
+// chain-of-thought before emitting the JSON answer (Workers AI
+// returned `finish_reason: 'length'`, `content: null` reliably
+// across multiple prompt + max_tokens permutations). GLM is
+// non-reasoning, smaller, faster, and produces clean
+// structured JSON on the first try. DECISIONS.md updated.
+const MODEL = '@cf/zai-org/glm-4.7-flash'
 
 const JSON_SCHEMA = {
   type: 'object',
@@ -61,12 +59,9 @@ const JSON_SCHEMA = {
   ],
 }
 
-// Gemma 4 is a thinking model — it generates an internal
-// `reasoning` trace before emitting `content`. The prompt below is
-// tuned to MINIMIZE reasoning: short, directive, no examples (which
-// invite the model to elaborate), explicit "no explanation" cap.
-// Combined with the larger max_tokens budget, this keeps
-// finish_reason from hitting 'length' before the JSON appears.
+// Tight, directive prompt. No examples (which invite verbose
+// completions), no rationale invitation. Just the rules + the
+// required JSON. Works on GLM out of the box.
 const SYSTEM_PROMPT = `Classify a feedback ticket into bug | feature | query | spam.
 
 bug = broken / errors / unexpected behavior
@@ -142,32 +137,7 @@ async function callLLM(
     .filter(Boolean)
     .join('\n')
 
-  let lastError: unknown = null
-  for (const model of MODELS) {
-    try {
-      return await runOneModel(env, model, userPrompt)
-    } catch (err) {
-      lastError = err
-      console.warn('classify: model failed, trying next', {
-        model,
-        err: err instanceof Error ? err.message : String(err),
-      })
-    }
-  }
-  // Exhausted all models — surface the LAST error so the queue
-  // retries (and after retries exhaust, falls into Sentry via the
-  // worker's withSentry wrapper).
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('all classifier models failed')
-}
-
-async function runOneModel(
-  env: Env,
-  model: string,
-  userPrompt: string,
-): Promise<ClassificationResult> {
-  const response = await env.AI.run(model, {
+  const response = await env.AI.run(MODEL, {
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
@@ -177,24 +147,19 @@ async function runOneModel(
       json_schema: JSON_SCHEMA,
     },
     temperature: 0.1,
-    // Gemma 4's reasoning trace can run several hundred tokens
-    // before the JSON answer. 4000 is overkill for the answer
-    // (~150 tokens) but leaves enough headroom for the reasoning
-    // model to think + answer reliably. Non-reasoning models
-    // (GLM) just don't use it. Classifier cost is dwarfed by
-    // storage + queues, so we don't sweat the budget.
-    max_tokens: 4000,
+    // Real outputs are <300 tokens. 1000 is generous safety
+    // margin — classifier cost is dwarfed by storage + queues.
+    max_tokens: 1000,
   })
 
   // Workers AI returns several envelope shapes depending on model:
-  //   { choices: [{ message: { content: ... } }] }   ← OpenAI-compat (Gemma 4, GLM)
+  //   { choices: [{ message: { content: ... } }] }   ← OpenAI-compat (GLM)
   //   { response: "{...}" } / { response: {...} }    ← legacy CF
   //   { result:  ... }                               ← legacy CF alt
-  //   { ...parsed... }                                ← top-level
+  //   { ...parsed... }                               ← top-level
   const parsed = extractClassificationPayload(response)
   if (!parsed) {
     console.error('classify: unrecognized AI response shape', {
-      model,
       keys:
         response && typeof response === 'object'
           ? Object.keys(response as Record<string, unknown>)
@@ -207,7 +172,6 @@ async function runOneModel(
   const validation = ClassificationResultSchema.safeParse(parsed)
   if (!validation.success) {
     console.error('classify: AI returned schema-invalid JSON', {
-      model,
       issues: validation.error.issues.slice(0, 5),
       payload: trim(JSON.stringify(parsed), 400),
     })

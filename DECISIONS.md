@@ -404,3 +404,36 @@ We don't have varlock or a similar schema validator wired up here
 (despite a passing impression we did) — would be the right next
 step if env-var hygiene becomes a recurring theme. Today's
 defense is just keeping the var count low.
+
+
+---
+
+## 2026-05-03 — Classifier: GLM 4.7 Flash, not Gemma 4
+
+Plan.md §15 / DECISIONS.md 2026-04-22 chose
+`@cf/google/gemma-4-26b-a4b-it`. In production, every classify
+call returned `finish_reason: 'length'` with `content: null` —
+Gemma 4 is a reasoning model and its chain-of-thought ate the
+entire `max_tokens` budget before reaching the JSON. Tried
+several mitigations (4000-token budget, prompt tightening to
+discourage CoT, multi-model fallback) — all unreliable.
+
+Switched primary to `@cf/zai-org/glm-4.7-flash`:
+- Non-reasoning, smaller, faster, cheaper
+- Returns clean structured JSON via OpenAI-compat envelope on
+  the first try
+- Matches the JSON schema we ship without prompt tuning
+
+Trade-offs accepted:
+- Slightly less powerful for nuanced classification (probably
+  fine for 4-bucket bug/feature/query/spam)
+- New CF Workers AI model — vendor lock identical to before
+
+The envelope walker (`extractClassificationPayload`) covers OpenAI,
+legacy CF, and top-level shapes, so swapping models in the
+future is a one-line change in `MODEL`.
+
+If we revisit Gemma 4 later (e.g., CF ships a `reasoning_effort`
+flag), the path is: bump `MODELS` back to a fallback array,
+re-run the same prompt + schema, GLM is still in the chain as a
+safety net.
