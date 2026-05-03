@@ -140,14 +140,65 @@ async function callLLM(
     max_tokens: 400,
   })
 
-  const raw =
-    typeof response.response === 'string'
-      ? response.response
-      : typeof (response as { result?: string }).result === 'string'
-        ? (response as { result: string }).result
-        : JSON.stringify(response)
+  // Workers AI's Gemma 4 with json_schema response_format returns
+  // one of several shapes depending on model + binding version:
+  //   { response: { ...parsed... } }     ← object directly
+  //   { response: "{...}" }              ← stringified JSON
+  //   { result: { ...parsed... } }
+  //   { result: "{...}" }
+  //   { ...parsed... }                   ← top-level object
+  // Walk all of them. Throwing here forwards to msg.retry(), so be
+  // generous with what we accept; only fail if literally none of the
+  // common envelopes contain a usable object.
+  const parsed = extractClassificationPayload(response)
+  if (!parsed) {
+    console.error('classify: unrecognized AI response shape', {
+      keys: response && typeof response === 'object'
+        ? Object.keys(response as Record<string, unknown>)
+        : null,
+      sample: trim(JSON.stringify(response), 400),
+    })
+    throw new Error('AI response shape not recognized')
+  }
 
-  const parsedJson = JSON.parse(raw)
-  const validated = ClassificationResultSchema.parse(parsedJson)
-  return validated
+  const validation = ClassificationResultSchema.safeParse(parsed)
+  if (!validation.success) {
+    console.error('classify: AI returned schema-invalid JSON', {
+      issues: validation.error.issues.slice(0, 5),
+      payload: trim(JSON.stringify(parsed), 400),
+    })
+    throw new Error('AI returned schema-invalid JSON')
+  }
+  return validation.data
+}
+
+export function extractClassificationPayload(response: unknown): unknown {
+  if (!response || typeof response !== 'object') return null
+  const r = response as Record<string, unknown>
+  // Try .response → .result → top-level, in that order. Each can be
+  // a string (stringified JSON) or a plain object.
+  for (const key of ['response', 'result'] as const) {
+    const val = r[key]
+    if (typeof val === 'string') {
+      const tried = tryParseJson(val)
+      if (tried && typeof tried === 'object' && 'primary_type' in tried) return tried
+    } else if (val && typeof val === 'object' && 'primary_type' in (val as Record<string, unknown>)) {
+      return val
+    }
+  }
+  // Top-level fallback: maybe the SDK already unwrapped.
+  if ('primary_type' in r) return r
+  return null
+}
+
+function tryParseJson(s: string): unknown {
+  try {
+    return JSON.parse(s)
+  } catch {
+    return null
+  }
+}
+
+function trim(s: string, max: number): string {
+  return s.length > max ? `${s.slice(0, max)}…` : s
 }
