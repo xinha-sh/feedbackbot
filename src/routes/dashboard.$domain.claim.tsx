@@ -5,25 +5,19 @@ import { Check } from 'lucide-react'
 
 import { Btn, Chip, Slab } from '#/components/ui/brut'
 import { DnsRecordRow } from '#/components/ui/dns-record-row'
-import type { WorkspaceStateResponse } from '#/schema/claim'
+import { workspaceStateQuery } from '#/lib/queries'
 
 export const Route = createFileRoute('/dashboard/$domain/claim')({
   component: ClaimPage,
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(workspaceStateQuery(params.domain))
+      .catch(() => null),
 })
 
 function ClaimPage() {
   const { domain } = Route.useParams() as { domain: string }
-  const state = useQuery({
-    queryKey: ['workspace-state', domain],
-    queryFn: async (): Promise<WorkspaceStateResponse> => {
-      const res = await fetch(
-        `/api/workspace-state?domain=${encodeURIComponent(domain)}`,
-        { credentials: 'include' },
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return res.json()
-    },
-  })
+  const state = useQuery(workspaceStateQuery(domain))
 
   const verify = useMutation({
     mutationFn: async () => {

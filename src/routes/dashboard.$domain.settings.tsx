@@ -3,34 +3,20 @@ import { useQuery } from '@tanstack/react-query'
 import { Download } from 'lucide-react'
 
 import { Btn, Chip, Slab } from '#/components/ui/brut'
-
-type BillingSummary = {
-  plan: 'free' | 'lite' | 'starter' | 'scale'
-  entitlements: {
-    audit_log_export: boolean
-    api_access: boolean
-    sso_enabled: boolean
-  }
-}
+import { billingSummaryQuery } from '#/lib/queries'
 
 export const Route = createFileRoute('/dashboard/$domain/settings')({
   component: Settings,
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(billingSummaryQuery(params.domain))
+      .catch(() => null),
 })
 
 function Settings() {
   const { domain } = Route.useParams() as { domain: string }
 
-  const billing = useQuery({
-    queryKey: ['billing-summary', domain],
-    queryFn: async (): Promise<BillingSummary> => {
-      const res = await fetch(
-        `/api/admin/billing-summary?domain=${encodeURIComponent(domain)}`,
-        { credentials: 'include' },
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return res.json()
-    },
-  })
+  const billing = useQuery(billingSummaryQuery(domain))
 
   const ent = billing.data?.entitlements
 

@@ -1,5 +1,10 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 
 import { Btn, Chip, Slab, Tag, type TagKind } from '#/components/ui/brut'
@@ -44,15 +49,8 @@ const kindMap: Partial<Record<ClassificationKind, TagKind>> = {
   spam: 'spam',
 }
 
-export const Route = createFileRoute('/dashboard/$domain/tickets/$id')({
-  component: TicketDetail,
-})
-
-function TicketDetail() {
-  const { domain, id } = Route.useParams() as { domain: string; id: string }
-  const qc = useQueryClient()
-
-  const { data, isLoading, error } = useQuery({
+const ticketDetailQuery = (domain: string, id: string) =>
+  queryOptions({
     queryKey: ['admin-ticket', domain, id],
     queryFn: async (): Promise<DetailResponse> => {
       const res = await fetch(
@@ -63,6 +61,20 @@ function TicketDetail() {
       return res.json()
     },
   })
+
+export const Route = createFileRoute('/dashboard/$domain/tickets/$id')({
+  component: TicketDetail,
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(ticketDetailQuery(params.domain, params.id))
+      .catch(() => null),
+})
+
+function TicketDetail() {
+  const { domain, id } = Route.useParams() as { domain: string; id: string }
+  const qc = useQueryClient()
+
+  const { data, isLoading, error } = useQuery(ticketDetailQuery(domain, id))
 
   const patch = useMutation({
     mutationFn: async (body: Partial<{

@@ -7,9 +7,18 @@ import { Btn, Chip, LogoMark, Tag } from '#/components/ui/brut'
 import { ThemeToggle } from '#/components/theme-toggle'
 import { authClient } from '#/lib/auth-client'
 import { seoMeta } from '#/lib/seo'
+import { workspaceStateQuery } from '#/lib/queries'
 
 export const Route = createFileRoute('/dashboard/$domain')({
   component: DashboardLayout,
+  // Loader fetches the workspace state during navigation so the
+  // banner + claim child route hit a warm cache. Errors don't
+  // block the layout — TurnstileSyncBanner just stays hidden if
+  // workspace-state fails (its useQuery handles its own state).
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(workspaceStateQuery(params.domain))
+      .catch(() => null),
   head: ({ params }) => ({
     meta: seoMeta({
       path: `/dashboard/${params.domain}`,
@@ -103,18 +112,10 @@ function DashboardLayout() {
 // scope, or a transient CF API error).
 function TurnstileSyncBanner({ domain }: { domain: string }) {
   const [retryError, setRetryError] = useState<string | null>(null)
+  // Reuses the layout loader's cache entry — same queryKey,
+  // so the loader's prefetch warms this hook on first render.
   const state = useQuery({
-    queryKey: ['workspace-turnstile', domain],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/workspace-state?domain=${encodeURIComponent(domain)}`,
-        { credentials: 'include' },
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return (await res.json()) as {
-        workspace: { state: string; turnstile_synced_at: number | null }
-      }
-    },
+    ...workspaceStateQuery(domain),
     refetchInterval: (q) =>
       q.state.data?.workspace.turnstile_synced_at ? false : 30_000,
   })

@@ -12,7 +12,12 @@ export function getRouter() {
     context,
     scrollRestoration: true,
     defaultPreload: 'intent',
-    defaultPreloadStaleTime: 0,
+    // Hover-prefetched data stays fresh for 30s. Without this,
+    // every click would re-fetch the data the hover just loaded
+    // (defaultPreloadStaleTime defaults to 0 = "always stale").
+    // Match the QueryClient's queries.staleTime so router
+    // preloads and useQuery stay in lockstep.
+    defaultPreloadStaleTime: 30_000,
   })
 
   setupRouterSsrQueryIntegration({ router, queryClient: context.queryClient })

@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { Mail, Trash2, X } from 'lucide-react'
 
 import { Btn, Chip, Slab } from '#/components/ui/brut'
@@ -25,22 +30,8 @@ type MembersResponse = {
   }>
 }
 
-export const Route = createFileRoute('/dashboard/$domain/team')({
-  component: TeamPage,
-  head: ({ params }) => ({
-    meta: seoMeta({
-      path: `/dashboard/${params.domain}/team`,
-      title: `${params.domain} · team`,
-      noindex: true,
-    }),
-  }),
-})
-
-function TeamPage() {
-  const { domain } = Route.useParams() as { domain: string }
-  const qc = useQueryClient()
-
-  const list = useQuery({
+const membersQuery = (domain: string) =>
+  queryOptions({
     queryKey: ['admin-members', domain],
     queryFn: async (): Promise<MembersResponse> => {
       const res = await fetch(
@@ -54,6 +45,27 @@ function TeamPage() {
       return res.json()
     },
   })
+
+export const Route = createFileRoute('/dashboard/$domain/team')({
+  component: TeamPage,
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(membersQuery(params.domain))
+      .catch(() => null),
+  head: ({ params }) => ({
+    meta: seoMeta({
+      path: `/dashboard/${params.domain}/team`,
+      title: `${params.domain} · team`,
+      noindex: true,
+    }),
+  }),
+})
+
+function TeamPage() {
+  const { domain } = Route.useParams() as { domain: string }
+  const qc = useQueryClient()
+
+  const list = useQuery(membersQuery(domain))
 
   const invite = useMutation({
     mutationFn: async (vars: { email: string; role: 'member' | 'admin' }) => {
