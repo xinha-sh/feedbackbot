@@ -51,6 +51,8 @@ import { Route as ApiAdminAuditLogRouteImport } from './routes/api/admin/audit-l
 import { Route as DashboardDomainTicketsIdRouteImport } from './routes/dashboard.$domain.tickets.$id'
 import { Route as ApiIntegrationsSlackInstallRouteImport } from './routes/api/integrations/slack.install'
 import { Route as ApiIntegrationsSlackCallbackRouteImport } from './routes/api/integrations/slack.callback'
+import { Route as ApiIntegrationsGithubInstallRouteImport } from './routes/api/integrations/github.install'
+import { Route as ApiIntegrationsGithubCallbackRouteImport } from './routes/api/integrations/github.callback'
 import { Route as ApiAdminTicketsIdRouteImport } from './routes/api/admin/tickets.$id'
 import { Route as ApiAdminMembersMemberIdRouteImport } from './routes/api/admin/members.$memberId'
 import { Route as ApiAdminInvitationsInvitationIdRouteImport } from './routes/api/admin/invitations.$invitationId'
@@ -59,6 +61,7 @@ import { Route as ApiAdminTicketsIdClassifyRouteImport } from './routes/api/admi
 import { Route as ApiAdminIntegrationsIdTestSendRouteImport } from './routes/api/admin/integrations.$id.test-send'
 import { Route as ApiAdminIntegrationsIdSlackChannelsRouteImport } from './routes/api/admin/integrations.$id.slack-channels'
 import { Route as ApiAdminIntegrationsIdRoutesRouteImport } from './routes/api/admin/integrations.$id.routes'
+import { Route as ApiAdminIntegrationsIdGithubReposRouteImport } from './routes/api/admin/integrations.$id.github-repos'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -275,6 +278,18 @@ const ApiIntegrationsSlackCallbackRoute =
     path: '/api/integrations/slack/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiIntegrationsGithubInstallRoute =
+  ApiIntegrationsGithubInstallRouteImport.update({
+    id: '/api/integrations/github/install',
+    path: '/api/integrations/github/install',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiIntegrationsGithubCallbackRoute =
+  ApiIntegrationsGithubCallbackRouteImport.update({
+    id: '/api/integrations/github/callback',
+    path: '/api/integrations/github/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminTicketsIdRoute = ApiAdminTicketsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -318,6 +333,12 @@ const ApiAdminIntegrationsIdRoutesRoute =
   ApiAdminIntegrationsIdRoutesRouteImport.update({
     id: '/routes',
     path: '/routes',
+    getParentRoute: () => ApiAdminIntegrationsIdRoute,
+  } as any)
+const ApiAdminIntegrationsIdGithubReposRoute =
+  ApiAdminIntegrationsIdGithubReposRouteImport.update({
+    id: '/github-repos',
+    path: '/github-repos',
     getParentRoute: () => ApiAdminIntegrationsIdRoute,
   } as any)
 
@@ -365,9 +386,12 @@ export interface FileRoutesByFullPath {
   '/api/admin/invitations/$invitationId': typeof ApiAdminInvitationsInvitationIdRoute
   '/api/admin/members/$memberId': typeof ApiAdminMembersMemberIdRoute
   '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRouteWithChildren
+  '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
+  '/api/integrations/github/install': typeof ApiIntegrationsGithubInstallRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/install': typeof ApiIntegrationsSlackInstallRoute
   '/dashboard/$domain/tickets/$id': typeof DashboardDomainTicketsIdRoute
+  '/api/admin/integrations/$id/github-repos': typeof ApiAdminIntegrationsIdGithubReposRoute
   '/api/admin/integrations/$id/routes': typeof ApiAdminIntegrationsIdRoutesRoute
   '/api/admin/integrations/$id/slack-channels': typeof ApiAdminIntegrationsIdSlackChannelsRoute
   '/api/admin/integrations/$id/test-send': typeof ApiAdminIntegrationsIdTestSendRoute
@@ -416,9 +440,12 @@ export interface FileRoutesByTo {
   '/api/admin/invitations/$invitationId': typeof ApiAdminInvitationsInvitationIdRoute
   '/api/admin/members/$memberId': typeof ApiAdminMembersMemberIdRoute
   '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRouteWithChildren
+  '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
+  '/api/integrations/github/install': typeof ApiIntegrationsGithubInstallRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/install': typeof ApiIntegrationsSlackInstallRoute
   '/dashboard/$domain/tickets/$id': typeof DashboardDomainTicketsIdRoute
+  '/api/admin/integrations/$id/github-repos': typeof ApiAdminIntegrationsIdGithubReposRoute
   '/api/admin/integrations/$id/routes': typeof ApiAdminIntegrationsIdRoutesRoute
   '/api/admin/integrations/$id/slack-channels': typeof ApiAdminIntegrationsIdSlackChannelsRoute
   '/api/admin/integrations/$id/test-send': typeof ApiAdminIntegrationsIdTestSendRoute
@@ -469,9 +496,12 @@ export interface FileRoutesById {
   '/api/admin/invitations/$invitationId': typeof ApiAdminInvitationsInvitationIdRoute
   '/api/admin/members/$memberId': typeof ApiAdminMembersMemberIdRoute
   '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRouteWithChildren
+  '/api/integrations/github/callback': typeof ApiIntegrationsGithubCallbackRoute
+  '/api/integrations/github/install': typeof ApiIntegrationsGithubInstallRoute
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/install': typeof ApiIntegrationsSlackInstallRoute
   '/dashboard/$domain/tickets/$id': typeof DashboardDomainTicketsIdRoute
+  '/api/admin/integrations/$id/github-repos': typeof ApiAdminIntegrationsIdGithubReposRoute
   '/api/admin/integrations/$id/routes': typeof ApiAdminIntegrationsIdRoutesRoute
   '/api/admin/integrations/$id/slack-channels': typeof ApiAdminIntegrationsIdSlackChannelsRoute
   '/api/admin/integrations/$id/test-send': typeof ApiAdminIntegrationsIdTestSendRoute
@@ -523,9 +553,12 @@ export interface FileRouteTypes {
     | '/api/admin/invitations/$invitationId'
     | '/api/admin/members/$memberId'
     | '/api/admin/tickets/$id'
+    | '/api/integrations/github/callback'
+    | '/api/integrations/github/install'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/install'
     | '/dashboard/$domain/tickets/$id'
+    | '/api/admin/integrations/$id/github-repos'
     | '/api/admin/integrations/$id/routes'
     | '/api/admin/integrations/$id/slack-channels'
     | '/api/admin/integrations/$id/test-send'
@@ -574,9 +607,12 @@ export interface FileRouteTypes {
     | '/api/admin/invitations/$invitationId'
     | '/api/admin/members/$memberId'
     | '/api/admin/tickets/$id'
+    | '/api/integrations/github/callback'
+    | '/api/integrations/github/install'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/install'
     | '/dashboard/$domain/tickets/$id'
+    | '/api/admin/integrations/$id/github-repos'
     | '/api/admin/integrations/$id/routes'
     | '/api/admin/integrations/$id/slack-channels'
     | '/api/admin/integrations/$id/test-send'
@@ -626,9 +662,12 @@ export interface FileRouteTypes {
     | '/api/admin/invitations/$invitationId'
     | '/api/admin/members/$memberId'
     | '/api/admin/tickets/$id'
+    | '/api/integrations/github/callback'
+    | '/api/integrations/github/install'
     | '/api/integrations/slack/callback'
     | '/api/integrations/slack/install'
     | '/dashboard/$domain/tickets/$id'
+    | '/api/admin/integrations/$id/github-repos'
     | '/api/admin/integrations/$id/routes'
     | '/api/admin/integrations/$id/slack-channels'
     | '/api/admin/integrations/$id/test-send'
@@ -669,6 +708,8 @@ export interface RootRouteChildren {
   ApiScreenshotKeyRoute: typeof ApiScreenshotKeyRoute
   DashboardBillingSuccessRoute: typeof DashboardBillingSuccessRoute
   ApiAdminInvitationsInvitationIdRoute: typeof ApiAdminInvitationsInvitationIdRoute
+  ApiIntegrationsGithubCallbackRoute: typeof ApiIntegrationsGithubCallbackRoute
+  ApiIntegrationsGithubInstallRoute: typeof ApiIntegrationsGithubInstallRoute
   ApiIntegrationsSlackCallbackRoute: typeof ApiIntegrationsSlackCallbackRoute
   ApiIntegrationsSlackInstallRoute: typeof ApiIntegrationsSlackInstallRoute
 }
@@ -969,6 +1010,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIntegrationsSlackCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations/github/install': {
+      id: '/api/integrations/github/install'
+      path: '/api/integrations/github/install'
+      fullPath: '/api/integrations/github/install'
+      preLoaderRoute: typeof ApiIntegrationsGithubInstallRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/integrations/github/callback': {
+      id: '/api/integrations/github/callback'
+      path: '/api/integrations/github/callback'
+      fullPath: '/api/integrations/github/callback'
+      preLoaderRoute: typeof ApiIntegrationsGithubCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/tickets/$id': {
       id: '/api/admin/tickets/$id'
       path: '/$id'
@@ -1025,6 +1080,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminIntegrationsIdRoutesRouteImport
       parentRoute: typeof ApiAdminIntegrationsIdRoute
     }
+    '/api/admin/integrations/$id/github-repos': {
+      id: '/api/admin/integrations/$id/github-repos'
+      path: '/github-repos'
+      fullPath: '/api/admin/integrations/$id/github-repos'
+      preLoaderRoute: typeof ApiAdminIntegrationsIdGithubReposRouteImport
+      parentRoute: typeof ApiAdminIntegrationsIdRoute
+    }
   }
 }
 
@@ -1055,6 +1117,7 @@ const DashboardDomainRouteWithChildren = DashboardDomainRoute._addFileChildren(
 )
 
 interface ApiAdminIntegrationsIdRouteChildren {
+  ApiAdminIntegrationsIdGithubReposRoute: typeof ApiAdminIntegrationsIdGithubReposRoute
   ApiAdminIntegrationsIdRoutesRoute: typeof ApiAdminIntegrationsIdRoutesRoute
   ApiAdminIntegrationsIdSlackChannelsRoute: typeof ApiAdminIntegrationsIdSlackChannelsRoute
   ApiAdminIntegrationsIdTestSendRoute: typeof ApiAdminIntegrationsIdTestSendRoute
@@ -1062,6 +1125,8 @@ interface ApiAdminIntegrationsIdRouteChildren {
 
 const ApiAdminIntegrationsIdRouteChildren: ApiAdminIntegrationsIdRouteChildren =
   {
+    ApiAdminIntegrationsIdGithubReposRoute:
+      ApiAdminIntegrationsIdGithubReposRoute,
     ApiAdminIntegrationsIdRoutesRoute: ApiAdminIntegrationsIdRoutesRoute,
     ApiAdminIntegrationsIdSlackChannelsRoute:
       ApiAdminIntegrationsIdSlackChannelsRoute,
@@ -1153,6 +1218,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiScreenshotKeyRoute: ApiScreenshotKeyRoute,
   DashboardBillingSuccessRoute: DashboardBillingSuccessRoute,
   ApiAdminInvitationsInvitationIdRoute: ApiAdminInvitationsInvitationIdRoute,
+  ApiIntegrationsGithubCallbackRoute: ApiIntegrationsGithubCallbackRoute,
+  ApiIntegrationsGithubInstallRoute: ApiIntegrationsGithubInstallRoute,
   ApiIntegrationsSlackCallbackRoute: ApiIntegrationsSlackCallbackRoute,
   ApiIntegrationsSlackInstallRoute: ApiIntegrationsSlackInstallRoute,
 }

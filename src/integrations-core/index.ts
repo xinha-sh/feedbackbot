@@ -4,6 +4,7 @@
 import './webhook'
 import './slack'
 import './discord'
+import './github'
 
 export {
   getDispatcher,

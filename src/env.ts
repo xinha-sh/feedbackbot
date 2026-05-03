@@ -41,6 +41,11 @@ export interface Env {
   SENTRY_DSN?: string
   SLACK_CLIENT_ID?: string
   SLACK_CLIENT_SECRET?: string
+  // GitHub OAuth App credentials. Required for the GitHub Issues
+  // integration. App must be registered with the callback URL set
+  // to https://<host>/api/integrations/github/callback.
+  GITHUB_CLIENT_ID?: string
+  GITHUB_CLIENT_SECRET?: string
   DODO_PAYMENTS_API_KEY?: string
   DODO_PAYMENTS_WEBHOOK_SECRET?: string
   DODO_PAYMENTS_ENV?: 'test_mode' | 'live_mode'

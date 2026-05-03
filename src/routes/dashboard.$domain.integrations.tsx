@@ -15,6 +15,7 @@ import type { IntegrationCreate } from '#/schema/integration'
 const searchSchema = z
   .object({
     slack: z.enum(['installed', 'error']).optional(),
+    github: z.enum(['installed', 'error']).optional(),
     reason: z.string().optional(),
     integration: z.string().optional(),
   })
@@ -22,7 +23,7 @@ const searchSchema = z
 
 type IntegrationRow = {
   id: string
-  kind: 'webhook' | 'slack' | 'discord'
+  kind: 'webhook' | 'slack' | 'discord' | 'github'
   name: string
   enabled: boolean
   createdAt: number
@@ -35,6 +36,16 @@ type SlackChannel = {
   name: string
   is_private: boolean
   is_member: boolean
+}
+
+type GitHubRepoRow = {
+  full_name: string
+  name: string
+  owner: string
+  private: boolean
+  archived: boolean
+  has_issues: boolean
+  description: string | null
 }
 
 type RouteRow = {
@@ -125,10 +136,13 @@ function IntegrationsPage() {
   // route editor so the admin can pick channels immediately.
   const [expandedId, setExpandedId] = useState<string | null>(null)
   useEffect(() => {
-    if (search.slack === 'installed' && search.integration) {
+    if (
+      (search.slack === 'installed' || search.github === 'installed') &&
+      search.integration
+    ) {
       setExpandedId(search.integration)
     }
-  }, [search.slack, search.integration])
+  }, [search.slack, search.github, search.integration])
 
   return (
     <div style={{ maxWidth: 840 }}>
@@ -148,8 +162,21 @@ function IntegrationsPage() {
           message={`Slack install failed${search.reason ? `: ${search.reason}` : '.'}`}
         />
       )}
+      {search.github === 'installed' && (
+        <InstallBanner
+          tone="ok"
+          message="GitHub connected. Pick a repo per ticket type below."
+        />
+      )}
+      {search.github === 'error' && (
+        <InstallBanner
+          tone="err"
+          message={`GitHub install failed${search.reason ? `: ${search.reason}` : '.'}`}
+        />
+      )}
 
       <SlackInstallCard domain={domain} />
+      <GitHubInstallCard domain={domain} />
       <DiscordForm
         onSubmit={(body) => create.mutate(body)}
         pending={create.isPending}
@@ -292,6 +319,11 @@ function IntegrationCard({
         >
           {integration.kind === 'slack' ? (
             <SlackRoutesEditor
+              integrationId={integration.id}
+              domain={domain}
+            />
+          ) : integration.kind === 'github' ? (
+            <GitHubRoutesEditor
               integrationId={integration.id}
               domain={domain}
             />
@@ -508,6 +540,223 @@ function SlackRoutesEditor({
         >
           private channels: invite the bot with /invite @FeedbackBot
         </span>
+      </div>
+    </div>
+  )
+}
+
+// Per-route GitHub config: pick a repo (owner/repo) per ticket kind.
+// Mirrors SlackRoutesEditor's shape — load list, draft per-kind
+// selection, PUT all routes on Save. We don't expose label
+// configuration here yet; the dispatcher reads `labels` from the
+// route config but the UI defaults to no labels (operators can
+// later patch the route config via the API if they need labels).
+function GitHubRoutesEditor({
+  integrationId,
+  domain,
+}: {
+  integrationId: string
+  domain: string
+}) {
+  const qc = useQueryClient()
+
+  const repos = useQuery({
+    queryKey: ['github-repos', integrationId, domain],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/admin/integrations/${encodeURIComponent(integrationId)}/github-repos?domain=${encodeURIComponent(domain)}`,
+        { credentials: 'include' },
+      )
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        throw new Error(t || `HTTP ${res.status}`)
+      }
+      return (await res.json()) as { repos: Array<GitHubRepoRow> }
+    },
+  })
+
+  const routes = useIntegrationRoutes(integrationId, domain)
+
+  // Selection holds the `owner/repo` string per kind, or '' for off.
+  const [draft, setDraft] = useState<Record<TicketKind, string>>({
+    bug: '',
+    feature: '',
+    query: '',
+  })
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => {
+    if (!routes.data || hydrated) return
+    const next: Record<TicketKind, string> = {
+      bug: '',
+      feature: '',
+      query: '',
+    }
+    for (const r of routes.data.routes) {
+      if (
+        (r.ticket_type === 'bug' ||
+          r.ticket_type === 'feature' ||
+          r.ticket_type === 'query') &&
+        typeof r.config.owner === 'string' &&
+        typeof r.config.repo === 'string'
+      ) {
+        next[r.ticket_type] = `${r.config.owner}/${r.config.repo}`
+      }
+    }
+    setDraft(next)
+    setHydrated(true)
+  }, [routes.data, hydrated])
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const desired = TICKET_KINDS.filter((k) => draft[k]).map((k) => {
+        const [owner, repo] = (draft[k] as string).split('/')
+        return {
+          ticket_type: k,
+          config: { owner, repo, labels: [] as Array<string> },
+        }
+      })
+      const res = await fetch(
+        `/api/admin/integrations/${encodeURIComponent(integrationId)}/routes?domain=${encodeURIComponent(domain)}`,
+        {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ routes: desired }),
+        },
+      )
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        throw new Error(t || `HTTP ${res.status}`)
+      }
+      return res.json()
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ['integration-routes', integrationId, domain],
+      }),
+  })
+
+  if (repos.isLoading || routes.isLoading) {
+    return (
+      <div className="h-mono" style={{ fontSize: 12, color: 'var(--fg-mute)' }}>
+        Loading repos…
+      </div>
+    )
+  }
+  if (repos.error) {
+    const msg = (repos.error as Error).message
+    const isAuth = /401|forbidden|invalid/i.test(msg)
+    return (
+      <div style={{ color: 'var(--danger)', fontSize: 13 }}>
+        Couldn't load repos: {msg}
+        {isAuth && (
+          <div style={{ marginTop: 6, color: 'var(--fg-mute)' }}>
+            Reinstall the GitHub integration to refresh the token.
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const repoList = repos.data?.repos ?? []
+
+  return (
+    <div>
+      <div
+        className="h-mono"
+        style={{
+          fontSize: 11,
+          color: 'var(--fg-mute)',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          marginBottom: 12,
+        }}
+      >
+        Route by ticket type ({repoList.length} repo
+        {repoList.length === 1 ? '' : 's'} available)
+      </div>
+
+      <div style={{ display: 'grid', gap: 10 }}>
+        {TICKET_KINDS.map((kind) => (
+          <div
+            key={kind}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(60px, max-content) minmax(0, 1fr)',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <span
+              className="h-mono"
+              style={{
+                fontSize: 12,
+                color: 'var(--fg-mute)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {kind}
+            </span>
+            <select
+              value={draft[kind]}
+              onChange={(e) =>
+                setDraft({ ...draft, [kind]: e.target.value })
+              }
+              style={{
+                width: '100%',
+                border: '1.5px solid var(--border)',
+                background: 'var(--surface)',
+                color: 'var(--fg)',
+                padding: '8px 10px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 13,
+                outline: 'none',
+              }}
+            >
+              <option value="">— don't deliver —</option>
+              {repoList.map((r) => (
+                <option key={r.full_name} value={r.full_name}>
+                  {r.private ? '🔒 ' : ''}
+                  {r.full_name}
+                  {r.has_issues ? '' : ' (issues disabled)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          marginTop: 14,
+          display: 'flex',
+          gap: 10,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
+        <Btn
+          size="sm"
+          variant="primary"
+          onClick={() => save.mutate()}
+          disabled={save.isPending}
+        >
+          {save.isPending ? 'Saving…' : 'Save routes'}
+        </Btn>
+        {save.isSuccess && (
+          <span
+            className="h-mono"
+            style={{ fontSize: 11, color: 'var(--ok)' }}
+          >
+            ✓ saved
+          </span>
+        )}
+        {save.error && (
+          <span style={{ fontSize: 12, color: 'var(--danger)' }}>
+            {(save.error as Error).message}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -812,6 +1061,55 @@ function SlackInstallCard({ domain }: { domain: string }) {
           size="sm"
         >
           Install Slack <ExternalLink size={12} strokeWidth={2} />
+        </Btn>
+      </div>
+    </div>
+  )
+}
+
+function GitHubInstallCard({ domain }: { domain: string }) {
+  return (
+    <div
+      className="hi-card hi-card-raised"
+      style={{ padding: 20, marginBottom: 20 }}
+    >
+      <div
+        className="h-mono"
+        style={{
+          fontSize: 11,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'var(--fg-mute)',
+          marginBottom: 10,
+        }}
+      >
+        GitHub Issues
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+            File a GitHub issue for every ticket
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--fg-mute)', lineHeight: 1.5 }}>
+            Install via GitHub OAuth. We request <code>repo</code> scope so
+            you can pick public or private repos. After install, choose a
+            repo per ticket type.
+          </div>
+        </div>
+        <Btn
+          as="a"
+          href={`/api/integrations/github/install?domain=${encodeURIComponent(domain)}`}
+          variant="primary"
+          size="sm"
+        >
+          Install GitHub <ExternalLink size={12} strokeWidth={2} />
         </Btn>
       </div>
     </div>

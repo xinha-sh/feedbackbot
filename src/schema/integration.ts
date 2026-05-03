@@ -3,7 +3,7 @@ import { ClassificationKindSchema } from './ticket'
 
 // ── integration kinds ────────────────────────────────────────────
 
-export const IntegrationKinds = ['webhook', 'slack', 'discord'] as const
+export const IntegrationKinds = ['webhook', 'slack', 'discord', 'github'] as const
 export const IntegrationKindSchema = z.enum(IntegrationKinds)
 export type IntegrationKind = z.infer<typeof IntegrationKindSchema>
 
@@ -35,10 +35,21 @@ const DiscordCreds = z.object({
       'must be a https://discord.com/api/webhooks/... URL',
     ),
 })
+// GitHub OAuth-App access tokens are long-lived (no refresh
+// rotation), so we only need to store the token + the user's
+// login + avatar for the integration display name.
+const GitHubCreds = z.object({
+  kind: z.literal('github'),
+  access_token: z.string().min(1),
+  login: z.string().min(1),
+  avatar_url: z.string().url().optional(),
+  scope: z.string().optional(),
+})
 export const IntegrationCredsSchema = z.discriminatedUnion('kind', [
   WebhookCreds,
   SlackCreds,
   DiscordCreds,
+  GitHubCreds,
 ])
 export type IntegrationCreds = z.infer<typeof IntegrationCredsSchema>
 
@@ -74,6 +85,16 @@ export const SlackRouteConfigSchema = z.object({
   channel_name: z.string().optional(),
 })
 export type SlackRouteConfig = z.infer<typeof SlackRouteConfigSchema>
+
+export const GitHubRouteConfigSchema = z.object({
+  owner: z.string().min(1),
+  repo: z.string().min(1),
+  // Optional comma-separated labels applied to every issue from this
+  // route. Empty string means "no labels". Customer-facing UI lets
+  // users pick from the repo's existing labels.
+  labels: z.array(z.string().min(1)).default([]),
+})
+export type GitHubRouteConfig = z.infer<typeof GitHubRouteConfigSchema>
 
 // ── outbound webhook payload (generic kind='webhook') ────────────
 // This is the public contract customers integrate against. Shape is
