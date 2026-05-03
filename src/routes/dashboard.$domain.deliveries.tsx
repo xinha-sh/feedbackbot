@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import {
   ChevronDown,
   ChevronRight,
@@ -42,16 +47,11 @@ const KIND_TAG: Partial<Record<ClassificationKind, TagKind>> = {
   spam: 'spam',
 }
 
-export const Route = createFileRoute('/dashboard/$domain/deliveries')({
-  component: DeliveriesPage,
-})
-
-function DeliveriesPage() {
-  const { domain } = Route.useParams() as { domain: string }
-  const qc = useQueryClient()
-  const [status, setStatus] = useState<'' | DeliveryStatus>('')
-
-  const list = useQuery({
+// Status filter is part of the queryKey because the server filters
+// server-side. The loader prefetches the default ('all') view so the
+// initial render is instant; switching filters refetches as before.
+const deliveriesQuery = (domain: string, status: '' | DeliveryStatus) =>
+  queryOptions({
     queryKey: ['admin-deliveries', domain, status],
     queryFn: async () => {
       const qs = new URLSearchParams({ domain })
@@ -63,6 +63,21 @@ function DeliveriesPage() {
       return (await res.json()) as { deliveries: Array<DeliveryRow> }
     },
   })
+
+export const Route = createFileRoute('/dashboard/$domain/deliveries')({
+  component: DeliveriesPage,
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(deliveriesQuery(params.domain, ''))
+      .catch(() => null),
+})
+
+function DeliveriesPage() {
+  const { domain } = Route.useParams() as { domain: string }
+  const qc = useQueryClient()
+  const [status, setStatus] = useState<'' | DeliveryStatus>('')
+
+  const list = useQuery(deliveriesQuery(domain, status))
 
   const redrive = useMutation({
     mutationFn: async (ticketId: string) => {

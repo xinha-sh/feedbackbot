@@ -6,6 +6,7 @@ import { Check } from 'lucide-react'
 import { Btn, Chip, Slab } from '#/components/ui/brut'
 import { seoMeta } from '#/lib/seo'
 import type { PlanId } from '#/lib/billing/plans'
+import { type BillingSummary, billingSummaryQuery } from '#/lib/queries'
 
 // Shared sessionStorage key — set in /login when user arrives via the
 // landing page "Upgrade to <plan>" CTA. Consumed + cleared here.
@@ -46,30 +47,6 @@ async function openCustomerPortal(): Promise<{ url: string }> {
     throw new Error(t || 'portal unavailable')
   }
   return res.json()
-}
-
-type BillingSummary = {
-  workspace_id: string
-  plan: PlanId
-  plan_label: string
-  subscription_id: string | null
-  subscription_status: string | null
-  current_period_end: number | null
-  billing_enabled: boolean
-  entitlements: {
-    monthly_ticket_cap: number
-    hourly_burst: number
-    max_seats: number
-    max_integrations: number
-    remove_branding: boolean
-    sso_enabled: boolean
-    audit_log_export: boolean
-    api_access: boolean
-  }
-  usage: {
-    monthly_tickets_used: number
-    monthly_tickets_remaining: number
-  }
 }
 
 type Tier = {
@@ -129,6 +106,10 @@ const TIERS: Array<Tier> = [
 
 export const Route = createFileRoute('/dashboard/$domain/billing')({
   component: BillingPage,
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(billingSummaryQuery(params.domain))
+      .catch(() => null),
   head: ({ params }) => ({
     meta: seoMeta({
       path: `/dashboard/${params.domain}/billing`,
@@ -141,17 +122,7 @@ export const Route = createFileRoute('/dashboard/$domain/billing')({
 function BillingPage() {
   const { domain } = Route.useParams() as { domain: string }
 
-  const summary = useQuery({
-    queryKey: ['billing-summary', domain],
-    queryFn: async (): Promise<BillingSummary> => {
-      const res = await fetch(
-        `/api/admin/billing-summary?domain=${encodeURIComponent(domain)}`,
-        { credentials: 'include' },
-      )
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return res.json()
-    },
-  })
+  const summary = useQuery(billingSummaryQuery(domain))
 
   const upgrade = useMutation({
     mutationFn: async ({ slug }: { slug: string }) => {

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { Slab, Chip, Btn, Tag, type TagKind } from '#/components/ui/brut'
 import type { ClassificationKind, TicketStatus } from '#/schema/ticket'
@@ -16,8 +16,27 @@ type AdminTicket = {
   pageUrl: string | null
 }
 
+const ticketsQuery = (domain: string) =>
+  queryOptions({
+    queryKey: ['admin-tickets', domain],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/admin/tickets?domain=${encodeURIComponent(domain)}`,
+        { credentials: 'include' },
+      )
+      if (res.status === 401) throw new Error('sign in required')
+      if (res.status === 403) throw new Error('not a member of this workspace')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return (await res.json()) as { tickets: Array<AdminTicket> }
+    },
+  })
+
 export const Route = createFileRoute('/dashboard/$domain/')({
   component: Tickets,
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(ticketsQuery(params.domain))
+      .catch(() => null),
 })
 
 // Lanes shown in the Kanban view. `closed` is treated as archive
@@ -46,19 +65,7 @@ function Tickets() {
   const [showSpam, setShowSpam] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['admin-tickets', domain],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/admin/tickets?domain=${encodeURIComponent(domain)}`,
-        { credentials: 'include' },
-      )
-      if (res.status === 401) throw new Error('sign in required')
-      if (res.status === 403) throw new Error('not a member of this workspace')
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return (await res.json()) as { tickets: Array<AdminTicket> }
-    },
-  })
+  const { data, isLoading, error } = useQuery(ticketsQuery(domain))
 
   const tickets = data?.tickets ?? []
 

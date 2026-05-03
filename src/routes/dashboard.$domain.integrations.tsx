@@ -1,6 +1,11 @@
 import { createFileRoute, useSearch } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, ExternalLink, Trash2 } from 'lucide-react'
 import { z } from 'zod'
 
@@ -56,17 +61,8 @@ function useIntegrationRoutes(integrationId: string, domain: string) {
   })
 }
 
-export const Route = createFileRoute('/dashboard/$domain/integrations')({
-  component: IntegrationsPage,
-  validateSearch: (input) => searchSchema.parse(input),
-})
-
-function IntegrationsPage() {
-  const { domain } = Route.useParams() as { domain: string }
-  const search = useSearch({ from: '/dashboard/$domain/integrations' })
-  const qc = useQueryClient()
-
-  const list = useQuery({
+const integrationsQuery = (domain: string) =>
+  queryOptions({
     queryKey: ['admin-integrations', domain],
     queryFn: async () => {
       const res = await fetch(
@@ -77,6 +73,22 @@ function IntegrationsPage() {
       return (await res.json()) as { integrations: Array<IntegrationRow> }
     },
   })
+
+export const Route = createFileRoute('/dashboard/$domain/integrations')({
+  component: IntegrationsPage,
+  validateSearch: (input) => searchSchema.parse(input),
+  loader: ({ params, context }) =>
+    context.queryClient
+      .ensureQueryData(integrationsQuery(params.domain))
+      .catch(() => null),
+})
+
+function IntegrationsPage() {
+  const { domain } = Route.useParams() as { domain: string }
+  const search = useSearch({ from: '/dashboard/$domain/integrations' })
+  const qc = useQueryClient()
+
+  const list = useQuery(integrationsQuery(domain))
 
   const create = useMutation({
     mutationFn: async (body: IntegrationCreate) => {
