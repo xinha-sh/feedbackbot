@@ -3,6 +3,7 @@
 // subfolder here.
 import './webhook'
 import './slack'
+import './discord'
 
 export {
   getDispatcher,
