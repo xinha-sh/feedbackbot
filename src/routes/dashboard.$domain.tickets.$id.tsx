@@ -7,7 +7,7 @@ import type {
   ClassificationKind,
   TicketStatus,
 } from '#/schema/ticket'
-import { TicketStatuses } from '#/schema/ticket'
+import { ClassificationKinds, TicketStatuses } from '#/schema/ticket'
 
 type AdminTicket = {
   id: string
@@ -203,7 +203,7 @@ function TicketDetail() {
             className="hi-card"
             style={{
               padding: 16,
-              marginBottom: 24,
+              marginBottom: 16,
               display: 'flex',
               flexWrap: 'wrap',
               gap: 10,
@@ -243,6 +243,14 @@ function TicketDetail() {
             </Btn>
           </div>
 
+          <ClassificationControls
+            ticketId={id}
+            domain={domain}
+            current={data.ticket.classification}
+            patching={patch.isPending}
+            onPatch={(c) => patch.mutate({ classification: c })}
+          />
+
           <Slab num="·" right={`${data.comments.length} thread`}>
             Comments
           </Slab>
@@ -280,6 +288,116 @@ function TicketDetail() {
             </div>
           )}
         </>
+      )}
+    </div>
+  )
+}
+
+
+// Classification controls live below the status row on the
+// detail page. Three states the operator might be in:
+//
+// 1. Classification present + AI-confident → just show the tag
+//    + a manual override dropdown for corrections (mis-classified
+//    bugs as features, etc.).
+// 2. Classification null (worker failed after queue retries) →
+//    show a "Retry classification" button that re-enqueues, plus
+//    the manual override dropdown for when the model keeps
+//    failing on a quirky ticket.
+// 3. Operator wants to manually classify regardless of AI →
+//    same dropdown lets them override anytime.
+function ClassificationControls({
+  ticketId,
+  domain,
+  current,
+  patching,
+  onPatch,
+}: {
+  ticketId: string
+  domain: string
+  current: ClassificationKind | null
+  patching: boolean
+  onPatch: (c: ClassificationKind) => void
+}) {
+  const qc = useQueryClient()
+  const retry = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(
+        `/api/admin/tickets/${encodeURIComponent(ticketId)}/classify?domain=${encodeURIComponent(domain)}`,
+        { method: 'POST', credentials: 'include' },
+      )
+      if (!res.ok) {
+        const t = await res.text().catch(() => '')
+        throw new Error(t || `HTTP ${res.status}`)
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-ticket', domain, ticketId] })
+    },
+  })
+
+  return (
+    <div
+      className="hi-card"
+      style={{
+        padding: 16,
+        marginBottom: 24,
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 10,
+        alignItems: 'center',
+      }}
+    >
+      <span
+        className="h-mono"
+        style={{
+          fontSize: 11,
+          color: 'var(--fg-faint)',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+        }}
+      >
+        kind
+      </span>
+      {current === null ? (
+        <span
+          className="h-mono"
+          style={{
+            fontSize: 11,
+            color: 'var(--fg-mute)',
+            padding: '2px 8px',
+            border: '1.5px dashed var(--border-soft)',
+          }}
+        >
+          awaiting classification
+        </span>
+      ) : null}
+      {ClassificationKinds.map((k) => (
+        <Btn
+          key={k}
+          size="sm"
+          variant={current === k ? 'primary' : 'default'}
+          onClick={() => onPatch(k)}
+          disabled={patching}
+        >
+          {k}
+        </Btn>
+      ))}
+      <div style={{ flex: 1 }} />
+      <Btn
+        size="sm"
+        variant="ghost"
+        onClick={() => retry.mutate()}
+        disabled={retry.isPending}
+        title="Re-run AI classifier on this ticket"
+      >
+        {retry.isPending ? 'Retrying…' : 'Retry classifier'}
+      </Btn>
+      {retry.error && (
+        <span style={{ fontSize: 12, color: 'var(--danger)' }}>
+          {(retry.error as Error).message}
+        </span>
       )}
     </div>
   )

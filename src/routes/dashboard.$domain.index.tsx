@@ -291,7 +291,22 @@ function KanbanCard({
             marginTop: 2,
           }}
         >
-          {tagKind && <Tag kind={tagKind} />}
+          {tagKind ? (
+            <Tag kind={tagKind} />
+          ) : (
+            <span
+              className="h-mono"
+              style={{
+                fontSize: 10,
+                color: 'var(--fg-faint)',
+                padding: '1px 6px',
+                border: '1.5px dashed var(--border-soft)',
+              }}
+              title="Classifier hasn't run yet OR failed — open the ticket to retry / override."
+            >
+              awaiting kind
+            </span>
+          )}
           <span
             className="h-mono"
             style={{ fontSize: 10, color: 'var(--fg-faint)' }}

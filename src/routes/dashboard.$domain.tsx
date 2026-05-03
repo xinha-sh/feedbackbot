@@ -1,9 +1,11 @@
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { LogOut } from 'lucide-react'
 
 import { Btn, Chip, LogoMark, Tag } from '#/components/ui/brut'
 import { ThemeToggle } from '#/components/theme-toggle'
+import { authClient } from '#/lib/auth-client'
 import { seoMeta } from '#/lib/seo'
 
 export const Route = createFileRoute('/dashboard/$domain')({
@@ -81,6 +83,7 @@ function DashboardLayout() {
             view public board →
           </Link>
           <ThemeToggle />
+          <SignOutButton />
         </div>
       </aside>
 
@@ -215,6 +218,42 @@ function SidebarLink({
     >
       {children}
     </Link>
+  )
+}
+
+// Sign-out lives in the sidebar footer next to the theme toggle.
+// Hard-reload to / on success so the / loader re-runs against
+// the cleared session cookies and routes the user accordingly.
+function SignOutButton() {
+  const [pending, setPending] = useState(false)
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={async () => {
+        setPending(true)
+        try {
+          await authClient.signOut()
+        } catch {
+          // best-effort
+        }
+        window.location.href = '/'
+      }}
+      className="hi-focus"
+      title="Sign out"
+      style={{
+        padding: 6,
+        border: '1.5px solid var(--border)',
+        background: 'transparent',
+        color: 'var(--fg-mute)',
+        cursor: pending ? 'wait' : 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+      }}
+      aria-label="Sign out"
+    >
+      <LogOut size={14} strokeWidth={2} />
+    </button>
   )
 }
 
