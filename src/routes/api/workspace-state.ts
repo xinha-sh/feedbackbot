@@ -66,7 +66,15 @@ async function handle(request: Request): Promise<Response> {
       }
     }
 
-    const dnsCheck = await verifyDomainTxt(domain, workspace.verificationToken)
+    // Skip the DNS round-trip for already-claimed workspaces. DNS
+    // verification only matters for the claim transition; once
+    // state='claimed', the dashboard's banner just needs
+    // turnstile_synced_at + workspace state. The DNS lookup was
+    // adding 100-500ms to every dashboard page load.
+    const dnsCheck =
+      workspace.state === 'claimed'
+        ? { verified: true, found: [] }
+        : await verifyDomainTxt(domain, workspace.verificationToken)
 
     const response: WorkspaceStateResponse = {
       workspace: {

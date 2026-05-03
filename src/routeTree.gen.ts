@@ -55,6 +55,7 @@ import { Route as ApiAdminTicketsIdRouteImport } from './routes/api/admin/ticket
 import { Route as ApiAdminMembersMemberIdRouteImport } from './routes/api/admin/members.$memberId'
 import { Route as ApiAdminInvitationsInvitationIdRouteImport } from './routes/api/admin/invitations.$invitationId'
 import { Route as ApiAdminIntegrationsIdRouteImport } from './routes/api/admin/integrations.$id'
+import { Route as ApiAdminTicketsIdClassifyRouteImport } from './routes/api/admin/tickets.$id.classify'
 import { Route as ApiAdminIntegrationsIdTestSendRouteImport } from './routes/api/admin/integrations.$id.test-send'
 import { Route as ApiAdminIntegrationsIdSlackChannelsRouteImport } from './routes/api/admin/integrations.$id.slack-channels'
 import { Route as ApiAdminIntegrationsIdRoutesRouteImport } from './routes/api/admin/integrations.$id.routes'
@@ -295,6 +296,12 @@ const ApiAdminIntegrationsIdRoute = ApiAdminIntegrationsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => ApiAdminIntegrationsRoute,
 } as any)
+const ApiAdminTicketsIdClassifyRoute =
+  ApiAdminTicketsIdClassifyRouteImport.update({
+    id: '/classify',
+    path: '/classify',
+    getParentRoute: () => ApiAdminTicketsIdRoute,
+  } as any)
 const ApiAdminIntegrationsIdTestSendRoute =
   ApiAdminIntegrationsIdTestSendRouteImport.update({
     id: '/test-send',
@@ -357,13 +364,14 @@ export interface FileRoutesByFullPath {
   '/api/admin/integrations/$id': typeof ApiAdminIntegrationsIdRouteWithChildren
   '/api/admin/invitations/$invitationId': typeof ApiAdminInvitationsInvitationIdRoute
   '/api/admin/members/$memberId': typeof ApiAdminMembersMemberIdRoute
-  '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRoute
+  '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRouteWithChildren
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/install': typeof ApiIntegrationsSlackInstallRoute
   '/dashboard/$domain/tickets/$id': typeof DashboardDomainTicketsIdRoute
   '/api/admin/integrations/$id/routes': typeof ApiAdminIntegrationsIdRoutesRoute
   '/api/admin/integrations/$id/slack-channels': typeof ApiAdminIntegrationsIdSlackChannelsRoute
   '/api/admin/integrations/$id/test-send': typeof ApiAdminIntegrationsIdTestSendRoute
+  '/api/admin/tickets/$id/classify': typeof ApiAdminTicketsIdClassifyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -407,13 +415,14 @@ export interface FileRoutesByTo {
   '/api/admin/integrations/$id': typeof ApiAdminIntegrationsIdRouteWithChildren
   '/api/admin/invitations/$invitationId': typeof ApiAdminInvitationsInvitationIdRoute
   '/api/admin/members/$memberId': typeof ApiAdminMembersMemberIdRoute
-  '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRoute
+  '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRouteWithChildren
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/install': typeof ApiIntegrationsSlackInstallRoute
   '/dashboard/$domain/tickets/$id': typeof DashboardDomainTicketsIdRoute
   '/api/admin/integrations/$id/routes': typeof ApiAdminIntegrationsIdRoutesRoute
   '/api/admin/integrations/$id/slack-channels': typeof ApiAdminIntegrationsIdSlackChannelsRoute
   '/api/admin/integrations/$id/test-send': typeof ApiAdminIntegrationsIdTestSendRoute
+  '/api/admin/tickets/$id/classify': typeof ApiAdminTicketsIdClassifyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -459,13 +468,14 @@ export interface FileRoutesById {
   '/api/admin/integrations/$id': typeof ApiAdminIntegrationsIdRouteWithChildren
   '/api/admin/invitations/$invitationId': typeof ApiAdminInvitationsInvitationIdRoute
   '/api/admin/members/$memberId': typeof ApiAdminMembersMemberIdRoute
-  '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRoute
+  '/api/admin/tickets/$id': typeof ApiAdminTicketsIdRouteWithChildren
   '/api/integrations/slack/callback': typeof ApiIntegrationsSlackCallbackRoute
   '/api/integrations/slack/install': typeof ApiIntegrationsSlackInstallRoute
   '/dashboard/$domain/tickets/$id': typeof DashboardDomainTicketsIdRoute
   '/api/admin/integrations/$id/routes': typeof ApiAdminIntegrationsIdRoutesRoute
   '/api/admin/integrations/$id/slack-channels': typeof ApiAdminIntegrationsIdSlackChannelsRoute
   '/api/admin/integrations/$id/test-send': typeof ApiAdminIntegrationsIdTestSendRoute
+  '/api/admin/tickets/$id/classify': typeof ApiAdminTicketsIdClassifyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -519,6 +529,7 @@ export interface FileRouteTypes {
     | '/api/admin/integrations/$id/routes'
     | '/api/admin/integrations/$id/slack-channels'
     | '/api/admin/integrations/$id/test-send'
+    | '/api/admin/tickets/$id/classify'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -569,6 +580,7 @@ export interface FileRouteTypes {
     | '/api/admin/integrations/$id/routes'
     | '/api/admin/integrations/$id/slack-channels'
     | '/api/admin/integrations/$id/test-send'
+    | '/api/admin/tickets/$id/classify'
   id:
     | '__root__'
     | '/'
@@ -620,6 +632,7 @@ export interface FileRouteTypes {
     | '/api/admin/integrations/$id/routes'
     | '/api/admin/integrations/$id/slack-channels'
     | '/api/admin/integrations/$id/test-send'
+    | '/api/admin/tickets/$id/classify'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -984,6 +997,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminIntegrationsIdRouteImport
       parentRoute: typeof ApiAdminIntegrationsRoute
     }
+    '/api/admin/tickets/$id/classify': {
+      id: '/api/admin/tickets/$id/classify'
+      path: '/classify'
+      fullPath: '/api/admin/tickets/$id/classify'
+      preLoaderRoute: typeof ApiAdminTicketsIdClassifyRouteImport
+      parentRoute: typeof ApiAdminTicketsIdRoute
+    }
     '/api/admin/integrations/$id/test-send': {
       id: '/api/admin/integrations/$id/test-send'
       path: '/test-send'
@@ -1076,12 +1096,23 @@ const ApiAdminMembersRouteWithChildren = ApiAdminMembersRoute._addFileChildren(
   ApiAdminMembersRouteChildren,
 )
 
+interface ApiAdminTicketsIdRouteChildren {
+  ApiAdminTicketsIdClassifyRoute: typeof ApiAdminTicketsIdClassifyRoute
+}
+
+const ApiAdminTicketsIdRouteChildren: ApiAdminTicketsIdRouteChildren = {
+  ApiAdminTicketsIdClassifyRoute: ApiAdminTicketsIdClassifyRoute,
+}
+
+const ApiAdminTicketsIdRouteWithChildren =
+  ApiAdminTicketsIdRoute._addFileChildren(ApiAdminTicketsIdRouteChildren)
+
 interface ApiAdminTicketsRouteChildren {
-  ApiAdminTicketsIdRoute: typeof ApiAdminTicketsIdRoute
+  ApiAdminTicketsIdRoute: typeof ApiAdminTicketsIdRouteWithChildren
 }
 
 const ApiAdminTicketsRouteChildren: ApiAdminTicketsRouteChildren = {
-  ApiAdminTicketsIdRoute: ApiAdminTicketsIdRoute,
+  ApiAdminTicketsIdRoute: ApiAdminTicketsIdRouteWithChildren,
 }
 
 const ApiAdminTicketsRouteWithChildren = ApiAdminTicketsRoute._addFileChildren(
